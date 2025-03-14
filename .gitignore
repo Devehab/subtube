@@ -2,6 +2,7 @@
 venv/
 .env
 .DS_Store
+.idea.md
 
 # ملفات التخزين المؤقت
 __pycache__/
