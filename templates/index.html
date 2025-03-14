@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SubTube - YouTube Subtitle Downloader</title>
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='image/icon128.png') }}">
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+        }
+        .loader {
+            border-top-color: #4f46e5;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-indigo-600">
+                <i class="fas fa-closed-captioning mr-2"></i>SubTube
+            </h1>
+            <p class="text-gray-600 mt-2">Download YouTube video subtitles with ease</p>
+        </header>
+
+        <!-- Main Form -->
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 mb-8">
+            <form id="urlForm" class="mb-4">
+                <div class="flex flex-col md:flex-row">
+                    <div class="flex-grow md:mr-4 mb-3 md:mb-0">
+                        <label for="youtubeUrl" class="block text-gray-700 mb-2">YouTube Video URL</label>
+                        <div class="flex">
+                            <input type="url" id="youtubeUrl" name="youtubeUrl" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition"
+                                   placeholder="https://www.youtube.com/watch?v=..." required>
+                            <button type="button" id="pasteBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-r-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition">
+                                <i class="fas fa-paste"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="self-end">
+                        <button type="submit" id="fetchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition">
+                            <i class="fas fa-search mr-2"></i>Fetch Subtitles
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Loading Animation -->
+            <div id="loading" class="hidden flex justify-center items-center my-6">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+                <span class="ml-3 text-gray-600">Fetching available subtitles...</span>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                <span id="errorText"></span>
+            </div>
+
+            <!-- Language Selection -->
+            <div id="languageSection" class="hidden mb-6">
+                <h3 class="text-lg font-semibold mb-3">Available Languages</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="languageOptions">
+                    <!-- Language options will be inserted here -->
+                </div>
+            </div>
+            
+            <!-- Format Selection -->
+            <div id="formatSection" class="hidden">
+                <h3 class="text-lg font-semibold mb-3">Download Format</h3>
+                <div class="flex flex-wrap gap-3" id="formatOptions">
+                    <button class="download-btn bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition" data-format="srt">
+                        <i class="fas fa-download mr-2"></i>SRT Format
+                    </button>
+                    <button class="download-btn bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition" data-format="vtt">
+                        <i class="fas fa-download mr-2"></i>VTT Format
+                    </button>
+                    <button class="download-btn bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 transition" data-format="txt">
+                        <i class="fas fa-download mr-2"></i>TXT Format
+                    </button>
+                </div>
+                
+                <div class="mt-6 border-t pt-4">
+                    <button type="button" id="showRawBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition">
+                        <i class="fas fa-file-alt mr-2"></i>Show RAW Text (Copy Directly)
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Raw Text Display -->
+            <div id="rawTextSection" class="hidden mt-6 border-t pt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-semibold">Raw Text</h3>
+                    <button id="copyRawBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-1 px-3 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition">
+                        <i class="fas fa-copy mr-1"></i>Copy All Text
+                    </button>
+                </div>
+                <div class="relative">
+                    <div id="rawTextContent" class="bg-gray-100 p-4 rounded-md max-h-80 overflow-y-auto whitespace-pre-wrap text-gray-800 border border-gray-300"></div>
+                    <div id="copySuccess" class="hidden absolute top-2 right-2 bg-green-500 text-white py-1 px-3 rounded-md text-sm">
+                        Copied!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4 text-indigo-600">How to Use</h2>
+            <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                <li>Paste a valid YouTube video URL in the input field</li>
+                <li>Click "Fetch Subtitles" to retrieve available subtitle languages</li>
+                <li>Select your preferred language from the options</li>
+                <li>Choose your preferred subtitle format (SRT, VTT, or TXT)</li>
+                <li>Or click "Show RAW Text" to display and copy the raw text</li>
+            </ol>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center text-gray-600 text-sm">
+            <p>SubTube &copy; <span id="currentYear"></span> - A YouTube Subtitle Downloader</p>
+            <p class="mt-2">Developed by <a href="https://github.com/Devehab" class="text-indigo-600 hover:text-indigo-800 transition" target="_blank">Ehab Kahwati</a></p>
+            <p class="mt-1">
+                <a href="https://github.com/Devehab/subtube" class="text-indigo-600 hover:text-indigo-800 transition" target="_blank">
+                    <i class="fab fa-github mr-1"></i>Contribute on GitHub
+                </a>
+            </p>
+            <p class="mt-3 text-xs text-gray-500">Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.en.html" class="text-gray-600 hover:text-gray-800 transition" target="_blank">GNU General Public License v3.0</a></p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set current year in footer
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+            
+            // Paste button functionality
+            const pasteBtn = document.getElementById('pasteBtn');
+            pasteBtn.addEventListener('click', function() {
+                // If input already has content, clear it
+                if (youtubeUrlInput.value.trim() !== '') {
+                    youtubeUrlInput.value = '';
+                    return;
+                }
+                
+                // Try to paste from clipboard
+                if (navigator.clipboard && navigator.clipboard.readText) {
+                    navigator.clipboard.readText()
+                        .then(text => {
+                            youtubeUrlInput.value = text.trim();
+                            // Focus on the input field
+                            youtubeUrlInput.focus();
+                        })
+                        .catch(err => {
+                            console.error('Failed to read clipboard contents: ', err);
+                            alert('Please grant clipboard permission or paste manually');
+                        });
+                } else {
+                    alert('Clipboard access not supported in your browser. Please paste manually.');
+                }
+            });
+            
+            // DOM Elements
+            const urlForm = document.getElementById('urlForm');
+            const youtubeUrlInput = document.getElementById('youtubeUrl');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            const languageSection = document.getElementById('languageSection');
+            const languageOptions = document.getElementById('languageOptions');
+            const formatSection = document.getElementById('formatSection');
+            const showRawBtn = document.getElementById('showRawBtn');
+            const rawTextSection = document.getElementById('rawTextSection');
+            const rawTextContent = document.getElementById('rawTextContent');
+            const copyRawBtn = document.getElementById('copyRawBtn');
+            const copySuccess = document.getElementById('copySuccess');
+            
+            // State variables
+            let selectedLanguage = null;
+            let videoUrl = null;
+            
+            // Handle form submission
+            urlForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                videoUrl = youtubeUrlInput.value.trim();
+                if (!isValidYouTubeUrl(videoUrl)) {
+                    showError('Please enter a valid YouTube URL');
+                    return;
+                }
+                
+                // Reset previous results
+                languageSection.classList.add('hidden');
+                formatSection.classList.add('hidden');
+                rawTextSection.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+                
+                // Show loading
+                loading.classList.remove('hidden');
+                
+                // Fetch available languages
+                fetchLanguages(videoUrl);
+            });
+            
+            // Fetch available subtitle languages
+            function fetchLanguages(url) {
+                const formData = new FormData();
+                formData.append('url', url);
+                
+                fetch('/get_languages', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loading.classList.add('hidden');
+                    
+                    if (data.error) {
+                        showError(data.error);
+                        return;
+                    }
+                    
+                    if (data.languages && data.languages.length > 0) {
+                        displayLanguages(data.languages);
+                    } else {
+                        showError('No subtitles found for this video');
+                    }
+                })
+                .catch(error => {
+                    loading.classList.add('hidden');
+                    showError('Error: ' + error.message);
+                });
+            }
+            
+            // Display language options
+            function displayLanguages(languages) {
+                languageOptions.innerHTML = '';
+                
+                languages.forEach(lang => {
+                    const langBtn = document.createElement('button');
+                    langBtn.type = 'button';
+                    langBtn.className = 'language-btn bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 font-medium py-2 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition text-left';
+                    langBtn.dataset.langCode = lang.language_code;
+                    langBtn.innerHTML = `<i class="fas fa-language mr-2"></i>${lang.language}`;
+                    
+                    langBtn.addEventListener('click', function() {
+                        // Remove active class from all language buttons
+                        document.querySelectorAll('.language-btn').forEach(btn => {
+                            btn.classList.remove('bg-indigo-100', 'border-indigo-500');
+                            btn.classList.add('bg-white', 'border-gray-300');
+                        });
+                        
+                        // Add active class to selected button
+                        this.classList.remove('bg-white', 'border-gray-300');
+                        this.classList.add('bg-indigo-100', 'border-indigo-500');
+                        
+                        // Set selected language
+                        selectedLanguage = this.dataset.langCode;
+                        
+                        // Show format options
+                        formatSection.classList.remove('hidden');
+                        
+                        // Hide raw text section when changing language
+                        rawTextSection.classList.add('hidden');
+                    });
+                    
+                    languageOptions.appendChild(langBtn);
+                });
+                
+                languageSection.classList.remove('hidden');
+            }
+            
+            // RAW button click handler
+            showRawBtn.addEventListener('click', function() {
+                if (!selectedLanguage) {
+                    showError('Please select a language first');
+                    return;
+                }
+                
+                loading.classList.remove('hidden');
+                rawTextSection.classList.add('hidden');
+                
+                const formData = new FormData();
+                formData.append('url', videoUrl);
+                formData.append('language', selectedLanguage);
+                
+                fetch('/get_raw_text', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loading.classList.add('hidden');
+                    
+                    if (data.error) {
+                        showError(data.error);
+                        return;
+                    }
+                    
+                    // Display raw text
+                    rawTextContent.textContent = data.text;
+                    rawTextSection.classList.remove('hidden');
+                    
+                    // Scroll to the raw text section
+                    rawTextSection.scrollIntoView({ behavior: 'smooth' });
+                })
+                .catch(error => {
+                    loading.classList.add('hidden');
+                    showError('Error: ' + error.message);
+                });
+            });
+            
+            // Copy raw text button
+            copyRawBtn.addEventListener('click', function() {
+                const textToCopy = rawTextContent.textContent;
+                
+                // Fallback for older browsers
+                if (!navigator.clipboard) {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = textToCopy;
+                    textarea.style.position = 'fixed';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    
+                    try {
+                        document.execCommand('copy');
+                        showCopySuccess();
+                    } catch (err) {
+                        console.error('Failed to copy text: ', err);
+                    }
+                    
+                    document.body.removeChild(textarea);
+                    return;
+                }
+                
+                // Modern browsers
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => {
+                        showCopySuccess();
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy text: ', err);
+                    });
+            });
+            
+            function showCopySuccess() {
+                // Show success message
+                copySuccess.classList.remove('hidden');
+                setTimeout(() => {
+                    copySuccess.classList.add('hidden');
+                }, 2000);
+            }
+            
+            // Handle format selection and download
+            document.querySelectorAll('.download-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (!selectedLanguage) {
+                        showError('Please select a language first');
+                        return;
+                    }
+                    
+                    const format = this.dataset.format;
+                    downloadSubtitles(videoUrl, selectedLanguage, format);
+                });
+            });
+            
+            // Download subtitles
+            function downloadSubtitles(url, language, format) {
+                // Create form for download
+                const downloadForm = document.createElement('form');
+                downloadForm.method = 'POST';
+                downloadForm.action = '/download';
+                
+                // Add URL
+                const urlInput = document.createElement('input');
+                urlInput.type = 'hidden';
+                urlInput.name = 'url';
+                urlInput.value = url;
+                downloadForm.appendChild(urlInput);
+                
+                // Add language
+                const langInput = document.createElement('input');
+                langInput.type = 'hidden';
+                langInput.name = 'language';
+                langInput.value = language;
+                downloadForm.appendChild(langInput);
+                
+                // Add format
+                const formatInput = document.createElement('input');
+                formatInput.type = 'hidden';
+                formatInput.name = 'format';
+                formatInput.value = format;
+                downloadForm.appendChild(formatInput);
+                
+                // Submit form
+                document.body.appendChild(downloadForm);
+                downloadForm.submit();
+                document.body.removeChild(downloadForm);
+            }
+            
+            // Show error message
+            function showError(message) {
+                errorText.textContent = message;
+                errorMessage.classList.remove('hidden');
+            }
+            
+            // Validate YouTube URL
+            function isValidYouTubeUrl(url) {
+                const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/;
+                return youtubeRegex.test(url);
+            }
+        });
+    </script>
+</body>
+</html>

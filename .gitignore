@@ -1,0 +1,12 @@
+# البيئة الافتراضية
+venv/
+.env
+.DS_Store
+
+# ملفات التخزين المؤقت
+__pycache__/
+*.pyc
+*.pyo
+
+# ملفات Jupyter Notebook المؤقتة
+.ipynb_checkpoints/

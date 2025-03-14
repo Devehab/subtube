@@ -1,0 +1,4 @@
+Flask
+youtube_transcript_api
+requests
+gunicorn==20.1.0
