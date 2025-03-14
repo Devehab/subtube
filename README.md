@@ -11,7 +11,7 @@
 
 SubTube is a powerful web application that allows users to download, view, and copy subtitles from YouTube videos in various formats. Built with Flask and modern web technologies, it offers a seamless experience for accessing subtitle content without requiring advanced technical knowledge.
 
-![SubTube Screenshot](static/image/screencapture-subtube-2025-03-14-02_59_33.png)
+![SubTube Screenshot](static/image/demo.gif)
 
 ## Table of Contents
 
