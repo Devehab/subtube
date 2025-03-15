@@ -100,12 +100,26 @@ check_requirements() {
     
     if [ "$requirements_met" = false ]; then
         echo -e "\n${YELLOW}بعض المتطلبات مفقودة:${NC}$missing_dependencies"
-        echo -e "${YELLOW}هل تريد تثبيت هذه المتطلبات تلقائياً؟ [نعم/لا]${NC}"
-        read -r answer
-        if [[ "$answer" == "نعم" || "$answer" == "yes" || "$answer" == "y" ]]; then
-            echo -e "\n${YELLOW}جاري تثبيت المتطلبات المفقودة...${NC}"
-            install_dependencies "$missing_dependencies"
+        
+        # Check if running via curl | bash
+        if [ -t 0 ]; then
+            # Terminal is interactive
+            echo -e "${YELLOW}هل تريد تثبيت هذه المتطلبات تلقائياً؟ [نعم/لا]${NC}"
+            read -r answer
+            if [[ "$answer" == "نعم" || "$answer" == "yes" || "$answer" == "y" ]]; then
+                echo -e "\n${YELLOW}جاري تثبيت المتطلبات المفقودة...${NC}"
+                install_dependencies "$missing_dependencies"
+            else
+                echo -e "\n${RED}لا يمكن المتابعة بدون تثبيت المتطلبات. الرجاء تثبيتها يدوياً ثم تشغيل السكريبت مرة أخرى.${NC}"
+                exit 1
+            fi
         else
+            # Non-interactive mode (curl | bash)
+            echo -e "${YELLOW}تم اكتشاف أن السكريبت يعمل في وضع غير تفاعلي (curl | bash).${NC}"
+            echo -e "${YELLOW}لتثبيت المتطلبات تلقائياً، قم بتنزيل السكريبت أولاً ثم تشغيله:${NC}"
+            echo -e "${BLUE}curl -sSL https://raw.githubusercontent.com/Devehab/subtube/main/install.sh -o install.sh${NC}"
+            echo -e "${BLUE}chmod +x install.sh${NC}"
+            echo -e "${BLUE}./install.sh${NC}"
             echo -e "\n${RED}لا يمكن المتابعة بدون تثبيت المتطلبات. الرجاء تثبيتها يدوياً ثم تشغيل السكريبت مرة أخرى.${NC}"
             exit 1
         fi
