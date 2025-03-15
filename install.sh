@@ -10,9 +10,47 @@ echo -e "${GREEN}SubTube Installer${NC}"
 echo "============================"
 echo "This script will install and run SubTube"
 
+# Default port
+PORT=5000
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Check if a port is in use
+check_port() {
+    local port=$1
+    if command_exists nc; then
+        nc -z localhost $port >/dev/null 2>&1
+        return $?
+    elif command_exists lsof; then
+        lsof -i :$port >/dev/null 2>&1
+        return $?
+    else
+        # If no tools are available, we'll find out when we try to run the container
+        return 1
+    fi
+}
+
+# Find an available port
+find_available_port() {
+    local start_port=$1
+    local port=$start_port
+    
+    echo -e "${YELLOW}Checking if port $port is available...${NC}"
+    
+    while check_port $port; do
+        echo -e "${YELLOW}Port $port is already in use, trying next port...${NC}"
+        port=$((port + 1))
+        if [ $port -gt $((start_port + 100)) ]; then
+            echo -e "${RED}Failed to find an available port after checking 100 ports.${NC}"
+            exit 1
+        fi
+    done
+    
+    echo -e "${GREEN}Port $port is available.${NC}"
+    PORT=$port
 }
 
 # Check if Docker is installed
@@ -143,7 +181,7 @@ create_compose_file() {
     echo -e "${YELLOW}Creating docker-compose.yml file...${NC}"
     
     # Create docker-compose.yml
-    cat > docker-compose.yml << 'EOL'
+    cat > docker-compose.yml << EOL
 version: '3.8'
 
 services:
@@ -152,7 +190,7 @@ services:
     container_name: subtube
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "${PORT}:5000"
     environment:
       - FLASK_ENV=production
       - FLASK_APP=app.py
@@ -164,7 +202,7 @@ networks:
     driver: bridge
 EOL
 
-    echo -e "${GREEN}✓${NC} docker-compose.yml created."
+    echo -e "${GREEN}✓${NC} docker-compose.yml created with port ${PORT}."
 }
 
 # Run SubTube
@@ -197,7 +235,7 @@ run_subtube() {
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓${NC} SubTube is now running!"
-        echo -e "Access SubTube at: ${GREEN}http://localhost:5000${NC}"
+        echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
     else
         echo -e "${RED}✗${NC} Failed to start SubTube."
         exit 1
@@ -211,6 +249,9 @@ main() {
     
     # Check for Docker Compose
     check_compose
+    
+    # Check if default port is available, find another if not
+    find_available_port $PORT
     
     # Create compose file
     create_compose_file
