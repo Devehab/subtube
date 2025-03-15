@@ -55,91 +55,6 @@ check_port() {
     fi
 }
 
-# Function to find an available port automatically
-find_available_port() {
-    local start_port=$1
-    local port=$start_port
-    local max_attempts=20
-    local attempt=0
-    
-    echo -e "  ${YELLOW}→${NC} Finding an available port starting from $start_port..."
-    
-    while [ $attempt -lt $max_attempts ]; do
-        if check_port $port; then
-            echo -e "  ${GREEN}✓${NC} Found available port: $port"
-            echo $port
-            return 0
-        fi
-        
-        port=$((port + 1))
-        attempt=$((attempt + 1))
-    done
-    
-    # If we couldn't find an available port, return a default port and hope for the best
-    echo -e "  ${YELLOW}!${NC} Could not find an available port after $max_attempts attempts. Using port 8080."
-    echo 8080
-    return 1
-}
-
-# Function to get a valid port (works with curl piping)
-get_port() {
-    local port=$DEFAULT_PORT
-    
-    echo -e "\n${BOLD}Port Configuration${NC}"
-    echo -e "SubTube will run on a port on your machine and map to port 5000 in the Docker container."
-    
-    # Check if the default port is available
-    if ! check_port $DEFAULT_PORT; then
-        echo -e "  ${YELLOW}!${NC} Default port $DEFAULT_PORT is already in use."
-        port=$(find_available_port $((DEFAULT_PORT + 1)))
-    else
-        echo -e "  ${GREEN}✓${NC} Using default port: $DEFAULT_PORT"
-    fi
-    
-    echo $port
-}
-
-# Function to display progress
-show_progress() {
-    local duration=$1
-    local message=$2
-    local elapsed=0
-    local width=30
-    local percentage=0
-    
-    echo -e "${message}"
-    
-    while [ $elapsed -lt $duration ]; do
-        percentage=$((elapsed * 100 / duration))
-        completed=$((width * percentage / 100))
-        remaining=$((width - completed))
-        
-        progress="["
-        for ((i=0; i<completed; i++)); do
-            progress+="="
-        done
-        
-        if [ $completed -lt $width ]; then
-            progress+=">"
-            for ((i=0; i<remaining-1; i++)); do
-                progress+=" "
-            done
-        fi
-        
-        progress+="] ${percentage}%"
-        
-        echo -ne "\r${progress}"
-        sleep 1
-        ((elapsed++))
-    done
-    
-    echo -ne "\r["
-    for ((i=0; i<width; i++)); do
-        echo -ne "="
-    done
-    echo -e "] 100%  ${GREEN}✓${NC}\n"
-}
-
 # Check system requirements
 check_requirements() {
     echo -e "\n${BOLD}Checking system requirements...${NC}"
@@ -179,205 +94,64 @@ check_requirements() {
     fi
     
     if [ "$requirements_met" = false ]; then
-        echo -e "\n${YELLOW}Some requirements are missing. Installing them now...${NC}"
-        install_dependencies
+        echo -e "\n${YELLOW}Some requirements are missing.${NC}"
+        exit 1
     else
         echo -e "\n${GREEN}All requirements are met!${NC}"
     fi
 }
 
-# Install dependencies based on OS
-install_dependencies() {
-    # Detect OS
-    if [ "$(uname)" == "Darwin" ]; then
-        # macOS
-        echo -e "\n${BOLD}Installing dependencies for macOS...${NC}"
+# Find an available port
+find_port() {
+    echo -e "\n${BOLD}Port Configuration${NC}"
+    echo -e "SubTube will run on a port on your machine and map to port 5000 in the Docker container."
+    
+    # Check if the default port is available
+    if ! check_port $DEFAULT_PORT; then
+        echo -e "  ${YELLOW}!${NC} Default port $DEFAULT_PORT is already in use."
+        echo -e "  ${YELLOW}→${NC} Finding an available port starting from $((DEFAULT_PORT + 1))..."
         
-        # Check if Homebrew is installed
-        if ! command_exists brew; then
-            echo -e "  ${YELLOW}→${NC} Installing Homebrew..."
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        else
-            echo -e "  ${GREEN}✓${NC} Homebrew is already installed"
-        fi
+        # Try to find an available port
+        local port=$((DEFAULT_PORT + 1))
+        local max_attempts=20
+        local attempt=0
         
-        # Install Docker if not installed
-        if ! command_exists docker; then
-            echo -e "  ${YELLOW}→${NC} Installing Docker Desktop for Mac..."
-            echo -e "${YELLOW}Please download and install Docker Desktop from https://www.docker.com/products/docker-desktop/${NC}"
-            echo -e "${YELLOW}After installation, please run this script again.${NC}"
-            exit 1
-        fi
+        while [ $attempt -lt $max_attempts ]; do
+            if check_port $port; then
+                echo -e "  ${GREEN}✓${NC} Found available port: $port"
+                echo $port > /tmp/subtube_port.txt
+                return 0
+            fi
+            
+            port=$((port + 1))
+            attempt=$((attempt + 1))
+        done
         
-        # Install git if not installed
-        if ! command_exists git; then
-            echo -e "  ${YELLOW}→${NC} Installing git..."
-            brew install git
-        fi
-        
-        # Install curl if not installed
-        if ! command_exists curl; then
-            echo -e "  ${YELLOW}→${NC} Installing curl..."
-            brew install curl
-        fi
-        
-    elif [ -f /etc/debian_version ]; then
-        # Debian/Ubuntu
-        echo -e "\n${BOLD}Installing dependencies for Debian/Ubuntu...${NC}"
-        
-        # Update package lists
-        echo -e "  ${YELLOW}→${NC} Updating package lists..."
-        sudo apt-get update
-        
-        # Install Docker if not installed
-        if ! command_exists docker; then
-            echo -e "  ${YELLOW}→${NC} Installing Docker..."
-            sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            sudo apt-get update
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-            sudo usermod -aG docker $USER
-            echo -e "  ${YELLOW}→${NC} Added current user to docker group. You may need to log out and back in for this to take effect."
-        fi
-        
-        # Install Docker Compose if not installed
-        if ! command_exists docker-compose && ! command_exists "docker compose"; then
-            echo -e "  ${YELLOW}→${NC} Installing Docker Compose..."
-            sudo apt-get install -y docker-compose
-        fi
-        
-        # Install git if not installed
-        if ! command_exists git; then
-            echo -e "  ${YELLOW}→${NC} Installing git..."
-            sudo apt-get install -y git
-        fi
-        
-        # Install curl if not installed
-        if ! command_exists curl; then
-            echo -e "  ${YELLOW}→${NC} Installing curl..."
-            sudo apt-get install -y curl
-        fi
-        
-    elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
-        # Fedora/RHEL/CentOS
-        echo -e "\n${BOLD}Installing dependencies for Fedora/RHEL/CentOS...${NC}"
-        
-        # Update package lists
-        echo -e "  ${YELLOW}→${NC} Updating package lists..."
-        sudo dnf -y update
-        
-        # Install Docker if not installed
-        if ! command_exists docker; then
-            echo -e "  ${YELLOW}→${NC} Installing Docker..."
-            sudo dnf -y install dnf-plugins-core
-            sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-            sudo dnf -y install docker-ce docker-ce-cli containerd.io
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            sudo usermod -aG docker $USER
-            echo -e "  ${YELLOW}→${NC} Added current user to docker group. You may need to log out and back in for this to take effect."
-        fi
-        
-        # Install Docker Compose if not installed
-        if ! command_exists docker-compose && ! command_exists "docker compose"; then
-            echo -e "  ${YELLOW}→${NC} Installing Docker Compose..."
-            sudo dnf -y install docker-compose
-        fi
-        
-        # Install git if not installed
-        if ! command_exists git; then
-            echo -e "  ${YELLOW}→${NC} Installing git..."
-            sudo dnf -y install git
-        fi
-        
-        # Install curl if not installed
-        if ! command_exists curl; then
-            echo -e "  ${YELLOW}→${NC} Installing curl..."
-            sudo dnf -y install curl
-        fi
-        
-    elif [ -f /etc/arch-release ]; then
-        # Arch Linux
-        echo -e "\n${BOLD}Installing dependencies for Arch Linux...${NC}"
-        
-        # Update package lists
-        echo -e "  ${YELLOW}→${NC} Updating package lists..."
-        sudo pacman -Syu --noconfirm
-        
-        # Install Docker if not installed
-        if ! command_exists docker; then
-            echo -e "  ${YELLOW}→${NC} Installing Docker..."
-            sudo pacman -S --noconfirm docker
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            sudo usermod -aG docker $USER
-            echo -e "  ${YELLOW}→${NC} Added current user to docker group. You may need to log out and back in for this to take effect."
-        fi
-        
-        # Install Docker Compose if not installed
-        if ! command_exists docker-compose && ! command_exists "docker compose"; then
-            echo -e "  ${YELLOW}→${NC} Installing Docker Compose..."
-            sudo pacman -S --noconfirm docker-compose
-        fi
-        
-        # Install git if not installed
-        if ! command_exists git; then
-            echo -e "  ${YELLOW}→${NC} Installing git..."
-            sudo pacman -S --noconfirm git
-        fi
-        
-        # Install curl if not installed
-        if ! command_exists curl; then
-            echo -e "  ${YELLOW}→${NC} Installing curl..."
-            sudo pacman -S --noconfirm curl
-        fi
-        
+        # If we couldn't find an available port, use a default fallback
+        echo -e "  ${YELLOW}!${NC} Could not find an available port. Using port 8080."
+        echo "8080" > /tmp/subtube_port.txt
     else
-        echo -e "\n${RED}Unsupported operating system. Please install Docker and Docker Compose manually.${NC}"
-        exit 1
+        echo -e "  ${GREEN}✓${NC} Using default port: $DEFAULT_PORT"
+        echo "$DEFAULT_PORT" > /tmp/subtube_port.txt
     fi
-    
-    echo -e "\n${GREEN}All dependencies installed successfully!${NC}"
 }
 
-# Function to create docker-compose.yml with specified port
-create_compose_file() {
-    local port=$1
-    local install_dir=$2
+# Main function
+main() {
+    clear
+    print_logo
     
-    echo -e "  ${YELLOW}→${NC} Creating docker-compose.yml file with port $port..."
+    echo -e "${BOLD}Welcome to the SubTube Installer!${NC}"
+    echo -e "This script will install and run SubTube using Docker.\n"
     
-    cat > "$install_dir/docker-compose.yml" << EOL
-version: '3.8'
-
-services:
-  subtube:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: subtube:latest
-    container_name: subtube-app
-    restart: unless-stopped
-    ports:
-      - "${port}:5000"
-    environment:
-      - FLASK_ENV=production
-      - FLASK_APP=app.py
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
-EOL
-
-    echo -e "  ${GREEN}✓${NC} docker-compose.yml created successfully."
-}
-
-# Function to install and run SubTube with Docker
-run_with_docker() {
-    local port=$1
+    # Check system requirements
+    check_requirements
+    
+    # Find an available port and save it to a temporary file
+    find_port
+    SELECTED_PORT=$(cat /tmp/subtube_port.txt)
+    rm -f /tmp/subtube_port.txt
+    
     echo -e "\n${BOLD}Setting up SubTube with Docker...${NC}"
     
     # Create a directory for SubTube
@@ -401,8 +175,39 @@ run_with_docker() {
         exit 1
     fi
     
-    # Create docker-compose.yml with the specified port
-    create_compose_file "$port" "$install_dir"
+    # Remove any existing compose files to avoid conflicts
+    echo -e "  ${YELLOW}→${NC} Removing any existing compose files..."
+    rm -f docker-compose.yml compose.yml docker-compose.yaml compose.yaml
+    
+    # Create a simple compose file directly
+    echo -e "  ${YELLOW}→${NC} Creating docker-compose.yml file with port $SELECTED_PORT..."
+    
+    # Create the docker-compose.yml file
+    cat > docker-compose.yml << EOL
+version: '3.8'
+
+services:
+  subtube:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: subtube:latest
+    container_name: subtube-app
+    restart: unless-stopped
+    ports:
+      - "${SELECTED_PORT}:5000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+EOL
+    
+    echo -e "  ${GREEN}✓${NC} docker-compose.yml created successfully."
     
     # Build and run with Docker Compose
     echo -e "\n${BOLD}Building and starting SubTube with Docker...${NC}"
@@ -417,34 +222,13 @@ run_with_docker() {
     # Check if container is running
     if [ $? -eq 0 ]; then
         echo -e "\n${GREEN}SubTube is now running!${NC}"
-        echo -e "You can access it at ${BOLD}http://localhost:${port}${NC}"
+        echo -e "You can access it at ${BOLD}http://localhost:${SELECTED_PORT}${NC}"
         echo -e "\nTo stop SubTube, run: ${YELLOW}cd $install_dir && docker-compose down${NC}"
         echo -e "To start it again, run: ${YELLOW}cd $install_dir && docker-compose up -d${NC}"
     else
         echo -e "\n${RED}Failed to start SubTube. Please check the error messages above.${NC}"
         exit 1
     fi
-}
-
-# Main function
-main() {
-    clear
-    print_logo
-    
-    echo -e "${BOLD}Welcome to the SubTube Installer!${NC}"
-    echo -e "This script will install and run SubTube using Docker.\n"
-    
-    # Check system requirements
-    check_requirements
-    
-    # Get port automatically (no user input required)
-    PORT=$(get_port)
-    
-    # Show progress for downloading
-    show_progress 3 "${BOLD}Preparing installation...${NC}"
-    
-    # Install and run with Docker
-    run_with_docker "$PORT"
     
     echo -e "\n${GREEN}${BOLD}Installation completed successfully!${NC}"
     echo -e "Thank you for installing SubTube!"
