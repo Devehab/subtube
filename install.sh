@@ -296,6 +296,20 @@ install_dependencies() {
     fi
 }
 
+# Function to get local IP address based on OS
+get_local_ip() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux
+        hostname -I | awk '{print $1}'
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        ipconfig getifaddr en0 || ipconfig getifaddr en1
+    else
+        # Default fallback
+        echo "localhost"
+    fi
+}
+
 # Find an available port
 find_port() {
     echo -e "\n${BOLD}Port Configuration${NC}"
@@ -328,6 +342,40 @@ find_port() {
     else
         echo -e "  ${GREEN}✓${NC} Using default port: $DEFAULT_PORT"
         echo "$DEFAULT_PORT" > /tmp/subtube_port.txt
+    fi
+}
+
+# Start the containers
+start_containers() {
+    echo -e "\n${BOLD}Building and starting SubTube with Docker...${NC}"
+    cd "$install_dir" || exit
+    
+    # Stop and remove any existing containers with the same name to avoid conflicts
+    docker stop subtube-app >/dev/null 2>&1 || true
+    docker rm subtube-app >/dev/null 2>&1 || true
+    
+    # Check if using new or old Docker Compose command
+    if command_exists "docker compose"; then
+        docker compose up -d
+    else
+        docker-compose up -d
+    fi
+    
+    # Get status code
+    status=$?
+    
+    if [ $status -eq 0 ]; then
+        # Get local IP
+        LOCAL_IP=$(get_local_ip)
+        
+        echo -e "\n${GREEN}SubTube is now running!${NC}"
+        echo -e "You can access it at ${BOLD}http://localhost:${SELECTED_PORT}${NC}"
+        echo -e "Or from other devices on your network: ${BOLD}http://${LOCAL_IP}:${SELECTED_PORT}${NC}"
+        echo -e "\nTo stop SubTube, run: ${YELLOW}cd $install_dir && docker-compose down${NC}"
+        echo -e "To start it again, run: ${YELLOW}cd $install_dir && docker-compose up -d${NC}"
+    else
+        echo -e "\n${RED}Failed to start SubTube. Please check the error messages above.${NC}"
+        exit 1
     fi
 }
 
@@ -401,26 +449,8 @@ EOL
     
     echo -e "  ${GREEN}✓${NC} docker-compose.yml created successfully."
     
-    # Build and run with Docker Compose
-    echo -e "\n${BOLD}Building and starting SubTube with Docker...${NC}"
-    
-    # Check if using new or old Docker Compose command
-    if command_exists "docker compose"; then
-        docker compose up -d
-    else
-        docker-compose up -d
-    fi
-    
-    # Check if container is running
-    if [ $? -eq 0 ]; then
-        echo -e "\n${GREEN}SubTube is now running!${NC}"
-        echo -e "You can access it at ${BOLD}http://localhost:${SELECTED_PORT}${NC}"
-        echo -e "\nTo stop SubTube, run: ${YELLOW}cd $install_dir && docker-compose down${NC}"
-        echo -e "To start it again, run: ${YELLOW}cd $install_dir && docker-compose up -d${NC}"
-    else
-        echo -e "\n${RED}Failed to start SubTube. Please check the error messages above.${NC}"
-        exit 1
-    fi
+    # Start the containers
+    start_containers
     
     echo -e "\n${GREEN}${BOLD}Installation completed successfully!${NC}"
     echo -e "Thank you for installing SubTube!"
