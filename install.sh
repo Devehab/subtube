@@ -206,14 +206,21 @@ run_without_docker() {
     
     # Check if Python is installed
     if ! command_exists python3; then
-        echo -e "${RED}Python 3 is not installed. Please install Python 3 and try again.${NC}"
-        echo "Visit https://www.python.org/downloads/ to download and install Python 3."
-        exit 1
+        # On macOS, try with python command which might be Python 3
+        if command_exists python && python --version 2>&1 | grep -q "Python 3"; then
+            alias python3=python
+        else
+            echo -e "${RED}Python 3 is not installed. Please install Python 3 and try again.${NC}"
+            echo "Visit https://www.python.org/downloads/ to download and install Python 3."
+            exit 1
+        fi
     fi
     
-    # Create a temporary directory
-    TEMP_DIR=$(mktemp -d)
-    cd $TEMP_DIR
+    # Create a temporary directory in the user's home directory for better permissions
+    TEMP_DIR=$(mktemp -d "$HOME/subtube_install.XXXXXX") || TEMP_DIR="$HOME/subtube_install"
+    mkdir -p "$TEMP_DIR"
+    echo "Created temporary directory: $TEMP_DIR"
+    cd "$TEMP_DIR" || { echo "Failed to change to temporary directory"; exit 1; }
     
     # Clone the repository
     echo "Cloning SubTube repository..."
@@ -252,12 +259,17 @@ run_without_docker() {
     # Find available port
     find_available_port $PORT
     
-    # Run the application
+    # Run the application with appropriate flags for port
     echo "Starting SubTube..."
     echo -e "${GREEN}✓${NC} SubTube is now running!"
     echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
     echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
-    python3 app.py --port $PORT
+    # Determine if we should use --port or -p based on app.py
+    if grep -q -- "--port" app.py; then
+        python3 app.py --port $PORT
+    else
+        python3 app.py -p $PORT
+    fi
 }
 
 # Main script execution
@@ -271,7 +283,9 @@ main() {
         docker_install_instructions
         
         # Ask if the user wants to continue without Docker
-        echo -e "${YELLOW}Do you want to continue without Docker and run SubTube directly? (y/n)${NC}"
+        echo -e "${YELLOW}Do you want to continue without Docker and run SubTube directly with Python? (y/n)${NC}"
+        echo -e "${GREEN}Note: This will download and run SubTube using Python directly on your computer.${NC}"
+        echo -e "${GREEN}Type 'y' to continue with Python installation, or 'n' to cancel.${NC}"
         read -r answer
         if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
             echo -e "${YELLOW}Installation canceled. Please install Docker and try again.${NC}"
