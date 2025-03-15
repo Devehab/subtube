@@ -57,9 +57,10 @@ find_available_port() {
 check_docker() {
     if command_exists docker; then
         echo -e "${GREEN}✓${NC} Docker is installed."
+        return 0
     else
         echo -e "${RED}✗${NC} Docker is not installed."
-        install_docker
+        return 1
     fi
 }
 
@@ -67,15 +68,16 @@ check_docker() {
 check_compose() {
     if command_exists docker-compose || (command_exists docker && docker compose version >/dev/null 2>&1); then
         echo -e "${GREEN}✓${NC} Docker Compose is installed."
+        return 0
     else
         echo -e "${RED}✗${NC} Docker Compose is not installed."
-        install_compose
+        return 1
     fi
 }
 
-# Install Docker
-install_docker() {
-    echo -e "${YELLOW}Installing Docker...${NC}"
+# Install Docker instructions
+docker_install_instructions() {
+    echo -e "${YELLOW}Docker installation instructions:${NC}"
     
     # Detect OS
     if [ -f /etc/os-release ]; then
@@ -94,86 +96,42 @@ install_docker() {
         OS=$(uname -s)
     fi
     
-    # Install based on OS
+    # Instructions based on OS
     case "$OS" in
         *Ubuntu*|*Debian*)
-            echo "Detected Ubuntu or Debian system"
-            sudo apt-get update
-            sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            sudo apt-get update
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-            sudo systemctl enable docker
-            sudo systemctl start docker
-            sudo usermod -aG docker $USER
+            echo "For Ubuntu/Debian:"
+            echo "  sudo apt-get update"
+            echo "  sudo apt-get install -y docker.io docker-compose"
+            echo "  sudo systemctl enable --now docker"
+            echo "  sudo usermod -aG docker $USER"
+            echo "  newgrp docker"
             ;;
         *Fedora*|*CentOS*|*RHEL*)
-            echo "Detected Fedora/CentOS/RHEL system"
-            sudo dnf -y install dnf-plugins-core
-            sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-            sudo dnf install -y docker-ce docker-ce-cli containerd.io
-            sudo systemctl enable docker
-            sudo systemctl start docker
-            sudo usermod -aG docker $USER
+            echo "For Fedora/CentOS/RHEL:"
+            echo "  sudo dnf -y install dnf-plugins-core"
+            echo "  sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo"
+            echo "  sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin"
+            echo "  sudo systemctl enable --now docker"
+            echo "  sudo usermod -aG docker $USER"
+            echo "  newgrp docker"
             ;;
         *Arch*)
-            echo "Detected Arch Linux system"
-            sudo pacman -S docker
-            sudo systemctl enable docker
-            sudo systemctl start docker
-            sudo usermod -aG docker $USER
+            echo "For Arch Linux:"
+            echo "  sudo pacman -S docker docker-compose"
+            echo "  sudo systemctl enable --now docker"
+            echo "  sudo usermod -aG docker $USER"
+            echo "  newgrp docker"
             ;;
         *Darwin*)
-            echo "Detected macOS system"
-            echo "Please install Docker Desktop from https://www.docker.com/products/docker-desktop"
-            exit 1
+            echo "For macOS:"
+            echo "  Visit https://www.docker.com/products/docker-desktop to download and install Docker Desktop"
             ;;
         *)
-            echo "Unsupported operating system: $OS"
-            echo "Please install Docker manually: https://docs.docker.com/engine/install/"
-            exit 1
+            echo "For your OS, visit: https://docs.docker.com/engine/install/"
             ;;
     esac
     
-    # Check if Docker was installed correctly
-    if command_exists docker; then
-        echo -e "${GREEN}✓${NC} Docker installed successfully."
-    else
-        echo -e "${RED}✗${NC} Docker installation failed. Please install manually: https://docs.docker.com/engine/install/"
-        exit 1
-    fi
-}
-
-# Install Docker Compose
-install_compose() {
-    echo -e "${YELLOW}Installing Docker Compose...${NC}"
-    
-    # Check if docker compose plugin is available
-    if command_exists docker && docker compose version >/dev/null 2>&1; then
-        echo -e "${GREEN}✓${NC} Docker Compose plugin is already installed."
-        return
-    fi
-    
-    # Detect OS
-    if [ "$(uname -s)" = "Darwin" ]; then
-        echo "Please install Docker Desktop which includes Docker Compose"
-        exit 1
-    fi
-    
-    # Install Docker Compose plugin
-    DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/lib/docker/cli-plugins}
-    sudo mkdir -p $DOCKER_CONFIG
-    sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o $DOCKER_CONFIG/docker-compose
-    sudo chmod +x $DOCKER_CONFIG/docker-compose
-    
-    # Check if Docker Compose was installed correctly
-    if command_exists docker-compose || (command_exists docker && docker compose version >/dev/null 2>&1); then
-        echo -e "${GREEN}✓${NC} Docker Compose installed successfully."
-    else
-        echo -e "${RED}✗${NC} Docker Compose installation failed. Please install manually: https://docs.docker.com/compose/install/"
-        exit 1
-    fi
+    echo -e "${YELLOW}After installing Docker, run this script again.${NC}"
 }
 
 # Create docker-compose.yml
@@ -205,9 +163,9 @@ EOL
     echo -e "${GREEN}✓${NC} docker-compose.yml created with port ${PORT}."
 }
 
-# Run SubTube
-run_subtube() {
-    echo -e "${YELLOW}Starting SubTube...${NC}"
+# Run SubTube with Docker
+run_subtube_docker() {
+    echo -e "${YELLOW}Starting SubTube with Docker...${NC}"
     
     # Pull latest image
     echo "Pulling latest SubTube image..."
@@ -237,27 +195,116 @@ run_subtube() {
         echo -e "${GREEN}✓${NC} SubTube is now running!"
         echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
     else
-        echo -e "${RED}✗${NC} Failed to start SubTube."
+        echo -e "${RED}✗${NC} Failed to start SubTube with Docker."
+        run_without_docker
+    fi
+}
+
+# Install and run without Docker
+run_without_docker() {
+    echo -e "${YELLOW}Installing and running SubTube without Docker...${NC}"
+    
+    # Check if Python is installed
+    if ! command_exists python3; then
+        echo -e "${RED}Python 3 is not installed. Please install Python 3 and try again.${NC}"
+        echo "Visit https://www.python.org/downloads/ to download and install Python 3."
         exit 1
     fi
+    
+    # Create a temporary directory
+    TEMP_DIR=$(mktemp -d)
+    cd $TEMP_DIR
+    
+    # Clone the repository
+    echo "Cloning SubTube repository..."
+    if command_exists git; then
+        git clone https://github.com/Devehab/subtube.git
+        cd subtube
+    else
+        echo -e "${RED}Git is not installed, downloading zip file...${NC}"
+        if command_exists curl; then
+            curl -L -o subtube.zip https://github.com/Devehab/subtube/archive/main.zip
+            if command_exists unzip; then
+                unzip subtube.zip
+                cd subtube-main
+            else
+                echo -e "${RED}unzip is not installed. Please install unzip and try again.${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${RED}curl is not installed. Please install curl and try again.${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Create virtual environment
+    echo "Creating virtual environment..."
+    python3 -m venv venv
+    
+    # Activate virtual environment
+    echo "Activating virtual environment..."
+    source venv/bin/activate
+    
+    # Install dependencies
+    echo "Installing dependencies..."
+    pip3 install -r requirements.txt
+    
+    # Find available port
+    find_available_port $PORT
+    
+    # Run the application
+    echo "Starting SubTube..."
+    echo -e "${GREEN}✓${NC} SubTube is now running!"
+    echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
+    echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
+    python3 app.py --port $PORT
 }
 
 # Main script execution
 main() {
     # Check for Docker
-    check_docker
+    if check_docker; then
+        DOCKER_AVAILABLE=1
+    else
+        DOCKER_AVAILABLE=0
+        echo -e "${YELLOW}Docker is not installed. You can install it using the following instructions:${NC}"
+        docker_install_instructions
+        
+        # Ask if the user wants to continue without Docker
+        echo -e "${YELLOW}Do you want to continue without Docker and run SubTube directly? (y/n)${NC}"
+        read -r answer
+        if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+            echo -e "${YELLOW}Installation canceled. Please install Docker and try again.${NC}"
+            exit 0
+        fi
+    fi
     
-    # Check for Docker Compose
-    check_compose
-    
-    # Check if default port is available, find another if not
-    find_available_port $PORT
-    
-    # Create compose file
-    create_compose_file
-    
-    # Run SubTube
-    run_subtube
+    # If Docker is available, also check for Docker Compose
+    if [ "$DOCKER_AVAILABLE" = "1" ]; then
+        if check_compose; then
+            # Check if default port is available, find another if not
+            find_available_port $PORT
+            
+            # Create compose file
+            create_compose_file
+            
+            # Run SubTube with Docker
+            run_subtube_docker
+        else
+            echo -e "${YELLOW}Docker Compose is not installed. Do you want to continue without Docker Compose? (y/n)${NC}"
+            read -r answer
+            if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+                echo -e "${YELLOW}Installation canceled. Please install Docker Compose and try again.${NC}"
+                exit 0
+            fi
+            
+            # Continue without Docker Compose
+            run_without_docker
+        fi
+    else
+        # Run without Docker
+        run_without_docker
+    fi
 }
 
 # Run the main function
