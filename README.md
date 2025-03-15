@@ -50,6 +50,26 @@ For most systems, you can install SubTube with this one-line command:
 curl -sSL https://raw.githubusercontent.com/Devehab/subtube/main/install.sh | bash
 ```
 
+#### Automatic Background Installation
+
+For completely automated installation that runs in the background (no input needed):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Devehab/subtube/main/install.sh | bash
+```
+
+This will:
+- Install SubTube in your home directory (`~/subtube_app`)
+- Run it in the background automatically
+- Choose an available port (starting at 3012)
+- Fall back to Python if Docker isn't available
+- Display the URL when finished
+
+To stop the background service:
+```bash
+pkill -f 'python.*app.py'
+```
+
 If you're on macOS and encounter permission issues, try:
 
 ```bash

@@ -6,12 +6,14 @@ YELLOW="\033[1;33m"
 RED="\033[0;31m"
 NC="\033[0m" # No Color
 
+# Default port
+PORT=3012
+AUTO_MODE=true  # Always run in automatic mode
+BACKGROUND=true # Run in background
+
 echo -e "${GREEN}SubTube Installer${NC}"
 echo "============================"
 echo "This script will install and run SubTube"
-
-# Default port
-PORT=3012
 
 # Function to check if a command exists
 command_exists() {
@@ -53,31 +55,9 @@ find_available_port() {
     PORT=$port
 }
 
-# Check if Docker is installed
-check_docker() {
-    if command_exists docker; then
-        echo -e "${GREEN}✓${NC} Docker is installed."
-        return 0
-    else
-        echo -e "${RED}✗${NC} Docker is not installed."
-        return 1
-    fi
-}
-
-# Check if Docker Compose is installed
-check_compose() {
-    if command_exists docker-compose || (command_exists docker && docker compose version >/dev/null 2>&1); then
-        echo -e "${GREEN}✓${NC} Docker Compose is installed."
-        return 0
-    else
-        echo -e "${RED}✗${NC} Docker Compose is not installed."
-        return 1
-    fi
-}
-
-# Install Docker instructions
+# Display Docker installation instructions but don't wait
 docker_install_instructions() {
-    echo -e "${YELLOW}Docker installation instructions:${NC}"
+    echo -e "${YELLOW}Docker is not installed. Here are Docker installation instructions for your reference:${NC}"
     
     # Detect OS
     if [ -f /etc/os-release ]; then
@@ -102,25 +82,14 @@ docker_install_instructions() {
             echo "For Ubuntu/Debian:"
             echo "  sudo apt-get update"
             echo "  sudo apt-get install -y docker.io docker-compose"
-            echo "  sudo systemctl enable --now docker"
-            echo "  sudo usermod -aG docker $USER"
-            echo "  newgrp docker"
             ;;
         *Fedora*|*CentOS*|*RHEL*)
             echo "For Fedora/CentOS/RHEL:"
-            echo "  sudo dnf -y install dnf-plugins-core"
-            echo "  sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo"
-            echo "  sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin"
-            echo "  sudo systemctl enable --now docker"
-            echo "  sudo usermod -aG docker $USER"
-            echo "  newgrp docker"
+            echo "  sudo dnf install -y docker docker-compose"
             ;;
         *Arch*)
             echo "For Arch Linux:"
             echo "  sudo pacman -S docker docker-compose"
-            echo "  sudo systemctl enable --now docker"
-            echo "  sudo usermod -aG docker $USER"
-            echo "  newgrp docker"
             ;;
         *Darwin*)
             echo "For macOS:"
@@ -131,7 +100,7 @@ docker_install_instructions() {
             ;;
     esac
     
-    echo -e "${YELLOW}After installing Docker, run this script again.${NC}"
+    echo -e "${YELLOW}Proceeding with direct Python installation...${NC}"
 }
 
 # Create docker-compose.yml
@@ -194,9 +163,10 @@ run_subtube_docker() {
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓${NC} SubTube is now running!"
         echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
+        return 0
     else
         echo -e "${RED}✗${NC} Failed to start SubTube with Docker."
-        run_without_docker
+        return 1
     fi
 }
 
@@ -217,23 +187,35 @@ run_without_docker() {
     fi
     
     # Create a temporary directory in the user's home directory for better permissions
-    TEMP_DIR=$(mktemp -d "$HOME/subtube_install.XXXXXX") || TEMP_DIR="$HOME/subtube_install"
-    mkdir -p "$TEMP_DIR"
-    echo "Created temporary directory: $TEMP_DIR"
-    cd "$TEMP_DIR" || { echo "Failed to change to temporary directory"; exit 1; }
+    INSTALL_DIR="$HOME/subtube_app"
+    mkdir -p "$INSTALL_DIR"
+    echo "Created installation directory: $INSTALL_DIR"
+    cd "$INSTALL_DIR" || { echo "Failed to change to installation directory"; exit 1; }
     
     # Clone the repository
     echo "Cloning SubTube repository..."
     if command_exists git; then
-        git clone https://github.com/Devehab/subtube.git
-        cd subtube
+        git clone https://github.com/Devehab/subtube.git .
+        if [ $? -ne 0 ]; then
+            # If directory not empty, try to pull instead
+            if [ "$(ls -A $INSTALL_DIR)" ]; then
+                echo "Directory not empty, pulling latest changes instead..."
+                git pull
+            else
+                echo -e "${RED}Failed to clone repository.${NC}"
+                exit 1
+            fi
+        fi
     else
-        echo -e "${RED}Git is not installed, downloading zip file...${NC}"
+        echo -e "${YELLOW}Git is not installed, downloading zip file...${NC}"
         if command_exists curl; then
             curl -L -o subtube.zip https://github.com/Devehab/subtube/archive/main.zip
             if command_exists unzip; then
-                unzip subtube.zip
-                cd subtube-main
+                unzip -o subtube.zip
+                # Move all files from the subdirectory up one level
+                mv subtube-main/* .
+                rm -rf subtube-main
+                rm subtube.zip
             else
                 echo -e "${RED}unzip is not installed. Please install unzip and try again.${NC}"
                 exit 1
@@ -244,9 +226,13 @@ run_without_docker() {
         fi
     fi
     
-    # Create virtual environment
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        echo "Creating virtual environment..."
+        python3 -m venv venv
+    else
+        echo "Virtual environment already exists."
+    fi
     
     # Activate virtual environment
     echo "Activating virtual environment..."
@@ -259,63 +245,58 @@ run_without_docker() {
     # Find available port
     find_available_port $PORT
     
-    # Run the application with appropriate flags for port
+    # Run the application in background if requested
     echo "Starting SubTube..."
     echo -e "${GREEN}✓${NC} SubTube is now running!"
     echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
-    echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
-    # Determine if we should use --port or -p based on app.py
-    if grep -q -- "--port" app.py; then
-        python3 app.py --port $PORT
+    
+    # Create a script to run the app and handle stopping
+    cat > run_subtube.sh << EOL
+#!/bin/bash
+cd "$INSTALL_DIR"
+source venv/bin/activate
+if grep -q -- "--port" app.py; then
+    python3 app.py --port $PORT
+else
+    python3 app.py -p $PORT
+fi
+EOL
+    chmod +x run_subtube.sh
+    
+    if [ "$BACKGROUND" = true ]; then
+        echo -e "${YELLOW}Running in background. To stop SubTube, run: pkill -f 'python.*app.py'${NC}"
+        nohup ./run_subtube.sh > subtube.log 2>&1 &
+        echo $! > subtube.pid
+        echo -e "${GREEN}SubTube is running in the background with PID $(cat subtube.pid)${NC}"
+        echo -e "${YELLOW}View logs at: $INSTALL_DIR/subtube.log${NC}"
     else
-        python3 app.py -p $PORT
+        echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
+        ./run_subtube.sh
     fi
 }
 
-# Main script execution
+# Main script execution - automatic mode
 main() {
-    # Check for Docker
-    if check_docker; then
-        DOCKER_AVAILABLE=1
-    else
-        DOCKER_AVAILABLE=0
-        echo -e "${YELLOW}Docker is not installed. You can install it using the following instructions:${NC}"
-        docker_install_instructions
-        
-        # Ask if the user wants to continue without Docker
-        echo -e "${YELLOW}Do you want to continue without Docker and run SubTube directly with Python? (y/n)${NC}"
-        echo -e "${GREEN}Note: This will download and run SubTube using Python directly on your computer.${NC}"
-        echo -e "${GREEN}Type 'y' to continue with Python installation, or 'n' to cancel.${NC}"
-        read -r answer
-        if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
-            echo -e "${YELLOW}Installation canceled. Please install Docker and try again.${NC}"
-            exit 0
-        fi
-    fi
+    # Find available port
+    find_available_port $PORT
     
-    # If Docker is available, also check for Docker Compose
-    if [ "$DOCKER_AVAILABLE" = "1" ]; then
-        if check_compose; then
-            # Check if default port is available, find another if not
-            find_available_port $PORT
-            
-            # Create compose file
-            create_compose_file
-            
-            # Run SubTube with Docker
-            run_subtube_docker
-        else
-            echo -e "${YELLOW}Docker Compose is not installed. Do you want to continue without Docker Compose? (y/n)${NC}"
-            read -r answer
-            if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
-                echo -e "${YELLOW}Installation canceled. Please install Docker Compose and try again.${NC}"
-                exit 0
-            fi
-            
-            # Continue without Docker Compose
+    # Check for Docker
+    if command_exists docker && (command_exists docker-compose || (command_exists docker && docker compose version >/dev/null 2>&1)); then
+        echo -e "${GREEN}Docker and Docker Compose are installed. Using Docker installation method.${NC}"
+        # Create compose file
+        create_compose_file
+        # Run SubTube with Docker
+        if ! run_subtube_docker; then
+            echo -e "${YELLOW}Docker installation failed. Falling back to direct Python installation.${NC}"
             run_without_docker
         fi
     else
+        # Docker not available, show instructions but proceed with Python
+        if ! command_exists docker; then
+            docker_install_instructions
+        elif ! command_exists docker-compose && ! (command_exists docker && docker compose version >/dev/null 2>&1); then
+            echo -e "${YELLOW}Docker Compose is not installed. Proceeding with direct Python installation.${NC}"
+        fi
         # Run without Docker
         run_without_docker
     fi
