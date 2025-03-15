@@ -17,7 +17,6 @@ SubTube is a powerful web application that allows users to download, view, and c
 
 - [Features](#-features)
 - [Installation & Usage](#-installation--usage)
-  - [Easy Installation (One-Line)](#easy-installation-one-line)
   - [Traditional Method](#traditional-method)
   - [Docker Method](#docker-method)
   - [Docker Compose Method](#using-docker-compose)
@@ -41,42 +40,6 @@ SubTube is a powerful web application that allows users to download, view, and c
 - 🚀 **Fast and Lightweight**: Minimal resource usage for optimal performance
 
 ## 🚀 Installation & Usage
-
-### Easy Installation (One-Line)
-
-For most systems, you can install SubTube with this one-line command:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/Devehab/subtube/main/install.sh | bash
-```
-
-#### Automatic Background Installation
-
-For completely automated installation that runs in the background (no input needed):
-
-```bash
-curl -sSL https://raw.githubusercontent.com/Devehab/subtube/main/install.sh | bash
-```
-
-This will:
-- Install SubTube in your home directory (`~/subtube_app`)
-- Run it in the background automatically
-- Choose an available port (starting at 3012)
-- Fall back to Python if Docker isn't available
-- Display the URL when finished
-
-To stop the background service:
-```bash
-pkill -f 'python.*app.py'
-```
-
-If you're on macOS and encounter permission issues, try:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/Devehab/subtube/main/install.sh -o /tmp/install-subtube.sh && chmod +x /tmp/install-subtube.sh && /tmp/install-subtube.sh
-```
-
-When prompted, type `y` to continue with the Python installation if you don't have Docker installed.
 
 ### Traditional Method
 
