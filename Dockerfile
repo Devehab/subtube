@@ -48,8 +48,8 @@ RUN useradd -m appuser && \
 # Switch to non-root user
 USER appuser
 
-# Expose the port the app runs on
-EXPOSE 5000
+# Expose the port the app runs on (default to 5000, but can be overridden)
+EXPOSE ${PORT:-5000}
 
 # Command to run the application with gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+CMD gunicorn --bind 0.0.0.0:${PORT:-5000} app:app

@@ -190,10 +190,11 @@ services:
     container_name: subtube
     restart: unless-stopped
     ports:
-      - "${PORT}:5000"
+      - "${PORT}:${PORT}"
     environment:
       - FLASK_ENV=production
       - FLASK_APP=app.py
+      - PORT=${PORT}
     networks:
       - app-network
 
