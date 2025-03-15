@@ -99,28 +99,28 @@ check_requirements() {
     fi
     
     if [ "$requirements_met" = false ]; then
-        echo -e "\n${YELLOW}بعض المتطلبات مفقودة:${NC}$missing_dependencies"
+        echo -e "\n${YELLOW}Missing dependencies:${NC}$missing_dependencies"
         
         # Check if running via curl | bash
         if [ -t 0 ]; then
             # Terminal is interactive
-            echo -e "${YELLOW}هل تريد تثبيت هذه المتطلبات تلقائياً؟ [نعم/لا]${NC}"
+            echo -e "${YELLOW}Do you want to install these dependencies automatically? [yes/no]${NC}"
             read -r answer
-            if [[ "$answer" == "نعم" || "$answer" == "yes" || "$answer" == "y" ]]; then
-                echo -e "\n${YELLOW}جاري تثبيت المتطلبات المفقودة...${NC}"
+            if [[ "$answer" == "yes" || "$answer" == "y" ]]; then
+                echo -e "\n${YELLOW}Installing missing dependencies...${NC}"
                 install_dependencies "$missing_dependencies"
             else
-                echo -e "\n${RED}لا يمكن المتابعة بدون تثبيت المتطلبات. الرجاء تثبيتها يدوياً ثم تشغيل السكريبت مرة أخرى.${NC}"
+                echo -e "\n${RED}Cannot continue without installing dependencies. Please install them manually and run the script again.${NC}"
                 exit 1
             fi
         else
             # Non-interactive mode (curl | bash)
-            echo -e "${YELLOW}تم اكتشاف أن السكريبت يعمل في وضع غير تفاعلي (curl | bash).${NC}"
-            echo -e "${YELLOW}لتثبيت المتطلبات تلقائياً، قم بتنزيل السكريبت أولاً ثم تشغيله:${NC}"
+            echo -e "${YELLOW}Detected script running in non-interactive mode (curl | bash).${NC}"
+            echo -e "${YELLOW}To install dependencies automatically, download the script first and then run it:${NC}"
             echo -e "${BLUE}curl -sSL https://raw.githubusercontent.com/Devehab/subtube/main/install.sh -o install.sh${NC}"
             echo -e "${BLUE}chmod +x install.sh${NC}"
             echo -e "${BLUE}./install.sh${NC}"
-            echo -e "\n${RED}لا يمكن المتابعة بدون تثبيت المتطلبات. الرجاء تثبيتها يدوياً ثم تشغيل السكريبت مرة أخرى.${NC}"
+            echo -e "\n${RED}Cannot continue without installing dependencies. Please install them manually and run the script again.${NC}"
             exit 1
         fi
     else
@@ -287,9 +287,9 @@ install_dependencies() {
     # Check if we need to restart the script to apply group changes
     if [[ "$missing_deps" == *"docker"* ]]; then
         echo -e "\n${YELLOW}You may need to log out and back in for Docker group changes to take effect.${NC}"
-        echo -e "${YELLOW}Would you like to continue anyway? [نعم/لا]${NC}"
+        echo -e "${YELLOW}Would you like to continue anyway? [yes/no]${NC}"
         read -r continue_answer
-        if [[ "$continue_answer" != "نعم" && "$continue_answer" != "yes" && "$continue_answer" != "y" ]]; then
+        if [[ "$continue_answer" != "yes" && "$continue_answer" != "y" ]]; then
             echo -e "${YELLOW}Please log out and back in, then run the script again.${NC}"
             exit 0
         fi
@@ -383,10 +383,7 @@ version: '3.8'
 
 services:
   subtube:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: subtube:latest
+    image: devehab/subtube:latest
     container_name: subtube-app
     restart: unless-stopped
     ports:
