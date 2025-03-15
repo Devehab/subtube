@@ -60,6 +60,7 @@ check_requirements() {
     echo -e "\n${BOLD}Checking system requirements...${NC}"
     
     local requirements_met=true
+    local missing_dependencies=""
     
     # Check for Docker
     if command_exists docker; then
@@ -67,6 +68,7 @@ check_requirements() {
     else
         echo -e "  ${RED}✗${NC} Docker is not installed"
         requirements_met=false
+        missing_dependencies="$missing_dependencies docker"
     fi
     
     # Check for Docker Compose
@@ -75,6 +77,7 @@ check_requirements() {
     else
         echo -e "  ${RED}✗${NC} Docker Compose is not installed"
         requirements_met=false
+        missing_dependencies="$missing_dependencies docker-compose"
     fi
     
     # Check for curl
@@ -83,6 +86,7 @@ check_requirements() {
     else
         echo -e "  ${RED}✗${NC} curl is not installed"
         requirements_met=false
+        missing_dependencies="$missing_dependencies curl"
     fi
     
     # Check for git
@@ -91,13 +95,190 @@ check_requirements() {
     else
         echo -e "  ${RED}✗${NC} git is not installed"
         requirements_met=false
+        missing_dependencies="$missing_dependencies git"
     fi
     
     if [ "$requirements_met" = false ]; then
-        echo -e "\n${YELLOW}Some requirements are missing.${NC}"
-        exit 1
+        echo -e "\n${YELLOW}بعض المتطلبات مفقودة:${NC}$missing_dependencies"
+        echo -e "${YELLOW}هل تريد تثبيت هذه المتطلبات تلقائياً؟ [نعم/لا]${NC}"
+        read -r answer
+        if [[ "$answer" == "نعم" || "$answer" == "yes" || "$answer" == "y" ]]; then
+            echo -e "\n${YELLOW}جاري تثبيت المتطلبات المفقودة...${NC}"
+            install_dependencies "$missing_dependencies"
+        else
+            echo -e "\n${RED}لا يمكن المتابعة بدون تثبيت المتطلبات. الرجاء تثبيتها يدوياً ثم تشغيل السكريبت مرة أخرى.${NC}"
+            exit 1
+        fi
     else
         echo -e "\n${GREEN}All requirements are met!${NC}"
+    fi
+}
+
+# Install dependencies based on OS
+install_dependencies() {
+    local missing_deps="$1"
+    
+    # Detect OS
+    if [ "$(uname)" == "Darwin" ]; then
+        # macOS
+        echo -e "\n${BOLD}Installing dependencies for macOS...${NC}"
+        
+        # Check if Homebrew is installed
+        if ! command_exists brew; then
+            echo -e "  ${YELLOW}→${NC} Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        else
+            echo -e "  ${GREEN}✓${NC} Homebrew is already installed"
+        fi
+        
+        # Install Docker if needed
+        if [[ "$missing_deps" == *"docker"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing Docker Desktop for Mac..."
+            echo -e "${YELLOW}Please download and install Docker Desktop from https://www.docker.com/products/docker-desktop/${NC}"
+            echo -e "${YELLOW}After installation, please run this script again.${NC}"
+            exit 1
+        fi
+        
+        # Install git if needed
+        if [[ "$missing_deps" == *"git"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing git..."
+            brew install git
+        fi
+        
+        # Install curl if needed
+        if [[ "$missing_deps" == *"curl"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing curl..."
+            brew install curl
+        fi
+        
+    elif [ -f /etc/debian_version ]; then
+        # Debian/Ubuntu
+        echo -e "\n${BOLD}Installing dependencies for Debian/Ubuntu...${NC}"
+        
+        # Update package lists
+        echo -e "  ${YELLOW}→${NC} Updating package lists..."
+        sudo apt-get update
+        
+        # Install Docker if needed
+        if [[ "$missing_deps" == *"docker"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing Docker..."
+            sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            sudo apt-get update
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+            sudo usermod -aG docker $USER
+            echo -e "  ${YELLOW}→${NC} Added current user to docker group. You may need to log out and back in for this to take effect."
+        fi
+        
+        # Install Docker Compose if needed
+        if [[ "$missing_deps" == *"docker-compose"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing Docker Compose..."
+            sudo apt-get install -y docker-compose
+        fi
+        
+        # Install git if needed
+        if [[ "$missing_deps" == *"git"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing git..."
+            sudo apt-get install -y git
+        fi
+        
+        # Install curl if needed
+        if [[ "$missing_deps" == *"curl"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing curl..."
+            sudo apt-get install -y curl
+        fi
+        
+    elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
+        # Fedora/RHEL/CentOS
+        echo -e "\n${BOLD}Installing dependencies for Fedora/RHEL/CentOS...${NC}"
+        
+        # Update package lists
+        echo -e "  ${YELLOW}→${NC} Updating package lists..."
+        sudo dnf -y update
+        
+        # Install Docker if needed
+        if [[ "$missing_deps" == *"docker"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing Docker..."
+            sudo dnf -y install dnf-plugins-core
+            sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+            sudo dnf -y install docker-ce docker-ce-cli containerd.io
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker $USER
+            echo -e "  ${YELLOW}→${NC} Added current user to docker group. You may need to log out and back in for this to take effect."
+        fi
+        
+        # Install Docker Compose if needed
+        if [[ "$missing_deps" == *"docker-compose"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing Docker Compose..."
+            sudo dnf -y install docker-compose
+        fi
+        
+        # Install git if needed
+        if [[ "$missing_deps" == *"git"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing git..."
+            sudo dnf -y install git
+        fi
+        
+        # Install curl if needed
+        if [[ "$missing_deps" == *"curl"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing curl..."
+            sudo dnf -y install curl
+        fi
+        
+    elif [ -f /etc/arch-release ]; then
+        # Arch Linux
+        echo -e "\n${BOLD}Installing dependencies for Arch Linux...${NC}"
+        
+        # Update package lists
+        echo -e "  ${YELLOW}→${NC} Updating package lists..."
+        sudo pacman -Syu --noconfirm
+        
+        # Install Docker if needed
+        if [[ "$missing_deps" == *"docker"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing Docker..."
+            sudo pacman -S --noconfirm docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker $USER
+            echo -e "  ${YELLOW}→${NC} Added current user to docker group. You may need to log out and back in for this to take effect."
+        fi
+        
+        # Install Docker Compose if needed
+        if [[ "$missing_deps" == *"docker-compose"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing Docker Compose..."
+            sudo pacman -S --noconfirm docker-compose
+        fi
+        
+        # Install git if needed
+        if [[ "$missing_deps" == *"git"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing git..."
+            sudo pacman -S --noconfirm git
+        fi
+        
+        # Install curl if needed
+        if [[ "$missing_deps" == *"curl"* ]]; then
+            echo -e "  ${YELLOW}→${NC} Installing curl..."
+            sudo pacman -S --noconfirm curl
+        fi
+        
+    else
+        echo -e "\n${RED}Unsupported operating system. Please install Docker and Docker Compose manually.${NC}"
+        exit 1
+    fi
+    
+    echo -e "\n${GREEN}All dependencies installed successfully!${NC}"
+    
+    # Check if we need to restart the script to apply group changes
+    if [[ "$missing_deps" == *"docker"* ]]; then
+        echo -e "\n${YELLOW}You may need to log out and back in for Docker group changes to take effect.${NC}"
+        echo -e "${YELLOW}Would you like to continue anyway? [نعم/لا]${NC}"
+        read -r continue_answer
+        if [[ "$continue_answer" != "نعم" && "$continue_answer" != "yes" && "$continue_answer" != "y" ]]; then
+            echo -e "${YELLOW}Please log out and back in, then run the script again.${NC}"
+            exit 0
+        fi
     fi
 }
 
