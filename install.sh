@@ -55,52 +55,46 @@ check_port() {
     fi
 }
 
-# Function to get a valid port from user
-get_valid_port() {
+# Function to find an available port automatically
+find_available_port() {
+    local start_port=$1
+    local port=$start_port
+    local max_attempts=20
+    local attempt=0
+    
+    echo -e "  ${YELLOW}→${NC} Finding an available port starting from $start_port..."
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if check_port $port; then
+            echo -e "  ${GREEN}✓${NC} Found available port: $port"
+            echo $port
+            return 0
+        fi
+        
+        port=$((port + 1))
+        attempt=$((attempt + 1))
+    done
+    
+    # If we couldn't find an available port, return a default port and hope for the best
+    echo -e "  ${YELLOW}!${NC} Could not find an available port after $max_attempts attempts. Using port 8080."
+    echo 8080
+    return 1
+}
+
+# Function to get a valid port (works with curl piping)
+get_port() {
     local port=$DEFAULT_PORT
-    local is_valid=false
     
     echo -e "\n${BOLD}Port Configuration${NC}"
     echo -e "SubTube will run on a port on your machine and map to port 5000 in the Docker container."
     
-    while [ "$is_valid" = false ]; do
-        echo -ne "\nEnter the port you want to use [${YELLOW}$DEFAULT_PORT${NC}]: "
-        read user_port
-        
-        # If user just pressed Enter, use default port
-        if [ -z "$user_port" ]; then
-            user_port=$DEFAULT_PORT
-        fi
-        
-        # Check if input is a number
-        if ! [[ "$user_port" =~ ^[0-9]+$ ]]; then
-            echo -e "${RED}Error: Port must be a number.${NC}"
-            continue
-        fi
-        
-        # Check if port is in valid range (1-65535)
-        if [ "$user_port" -lt 1 ] || [ "$user_port" -gt 65535 ]; then
-            echo -e "${RED}Error: Port must be between 1 and 65535.${NC}"
-            continue
-        fi
-        
-        # Check if port is available
-        if check_port "$user_port"; then
-            echo -e "${GREEN}Port $user_port is available.${NC}"
-            port=$user_port
-            is_valid=true
-        else
-            echo -e "${RED}Port $user_port is already in use.${NC}"
-            echo -e "Would you like to try another port? (${GREEN}y${NC}/${RED}n${NC}): "
-            read try_again
-            
-            if [ "$try_again" != "y" ] && [ "$try_again" != "Y" ]; then
-                echo -e "${YELLOW}Using default port $DEFAULT_PORT instead.${NC}"
-                port=$DEFAULT_PORT
-                is_valid=true
-            fi
-        fi
-    done
+    # Check if the default port is available
+    if ! check_port $DEFAULT_PORT; then
+        echo -e "  ${YELLOW}!${NC} Default port $DEFAULT_PORT is already in use."
+        port=$(find_available_port $((DEFAULT_PORT + 1)))
+    else
+        echo -e "  ${GREEN}✓${NC} Using default port: $DEFAULT_PORT"
+    fi
     
     echo $port
 }
@@ -443,8 +437,8 @@ main() {
     # Check system requirements
     check_requirements
     
-    # Get port from user
-    PORT=$(get_valid_port)
+    # Get port automatically (no user input required)
+    PORT=$(get_port)
     
     # Show progress for downloading
     show_progress 3 "${BOLD}Preparing installation...${NC}"
