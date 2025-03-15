@@ -11,7 +11,7 @@ echo "============================"
 echo "This script will install and run SubTube"
 
 # Default port
-PORT=5000
+PORT=3012
 
 # Function to check if a command exists
 command_exists() {
@@ -190,11 +190,10 @@ services:
     container_name: subtube
     restart: unless-stopped
     ports:
-      - "${PORT}:${PORT}"
+      - "${PORT}:5000"  # Host port maps to container port 5000
     environment:
       - FLASK_ENV=production
       - FLASK_APP=app.py
-      - PORT=${PORT}
     networks:
       - app-network
 

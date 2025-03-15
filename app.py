@@ -7,9 +7,6 @@ import tempfile
 
 app = Flask(__name__)
 
-# Get port from environment variable or use default
-PORT = int(os.environ.get('PORT', 5000))
-
 def extract_video_id(url):
     """Extract YouTube video ID from URL"""
     youtube_regex = (
@@ -171,4 +168,4 @@ def download_subtitles():
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=False, port=PORT)
+    app.run(debug=True, port=5000)

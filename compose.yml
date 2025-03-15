@@ -1,10 +1,12 @@
+version: '3.8'
+
 services:
   subtube:
     image: devehab/subtube:latest  # Replace with your Docker Hub image
     container_name: subtube
     restart: unless-stopped
     ports:
-      - "5000:5000"  # Expose the application on port 5000
+      - "3012:5000"  # Host port 3012 maps to container port 5000
     environment:
       - FLASK_ENV=production  # Example: Set environment variables if needed
       - FLASK_APP=app.py
