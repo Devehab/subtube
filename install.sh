@@ -9,6 +9,9 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 UNDERLINE='\033[4m'
 
+# Default port
+DEFAULT_PORT=5000
+
 # ASCII Art Logo
 print_logo() {
     echo -e "${BLUE}"
@@ -25,6 +28,81 @@ print_logo() {
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Function to check if a port is available
+check_port() {
+    local port=$1
+    
+    if command_exists nc; then
+        nc -z localhost $port >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            return 1  # Port is in use
+        else
+            return 0  # Port is available
+        fi
+    elif command_exists lsof; then
+        lsof -i :$port >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            return 1  # Port is in use
+        else
+            return 0  # Port is available
+        fi
+    else
+        # If no tools are available, we'll assume the port is available
+        # and let Docker handle any conflicts
+        return 0
+    fi
+}
+
+# Function to get a valid port from user
+get_valid_port() {
+    local port=$DEFAULT_PORT
+    local is_valid=false
+    
+    echo -e "\n${BOLD}Port Configuration${NC}"
+    echo -e "SubTube will run on a port on your machine and map to port 5000 in the Docker container."
+    
+    while [ "$is_valid" = false ]; do
+        echo -ne "\nEnter the port you want to use [${YELLOW}$DEFAULT_PORT${NC}]: "
+        read user_port
+        
+        # If user just pressed Enter, use default port
+        if [ -z "$user_port" ]; then
+            user_port=$DEFAULT_PORT
+        fi
+        
+        # Check if input is a number
+        if ! [[ "$user_port" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}Error: Port must be a number.${NC}"
+            continue
+        fi
+        
+        # Check if port is in valid range (1-65535)
+        if [ "$user_port" -lt 1 ] || [ "$user_port" -gt 65535 ]; then
+            echo -e "${RED}Error: Port must be between 1 and 65535.${NC}"
+            continue
+        fi
+        
+        # Check if port is available
+        if check_port "$user_port"; then
+            echo -e "${GREEN}Port $user_port is available.${NC}"
+            port=$user_port
+            is_valid=true
+        else
+            echo -e "${RED}Port $user_port is already in use.${NC}"
+            echo -e "Would you like to try another port? (${GREEN}y${NC}/${RED}n${NC}): "
+            read try_again
+            
+            if [ "$try_again" != "y" ] && [ "$try_again" != "Y" ]; then
+                echo -e "${YELLOW}Using default port $DEFAULT_PORT instead.${NC}"
+                port=$DEFAULT_PORT
+                is_valid=true
+            fi
+        fi
+    done
+    
+    echo $port
 }
 
 # Function to display progress
@@ -269,8 +347,43 @@ install_dependencies() {
     echo -e "\n${GREEN}All dependencies installed successfully!${NC}"
 }
 
+# Function to create docker-compose.yml with specified port
+create_compose_file() {
+    local port=$1
+    local install_dir=$2
+    
+    echo -e "  ${YELLOW}→${NC} Creating docker-compose.yml file with port $port..."
+    
+    cat > "$install_dir/docker-compose.yml" << EOL
+version: '3.8'
+
+services:
+  subtube:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: subtube:latest
+    container_name: subtube-app
+    restart: unless-stopped
+    ports:
+      - "${port}:5000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+EOL
+
+    echo -e "  ${GREEN}✓${NC} docker-compose.yml created successfully."
+}
+
 # Function to install and run SubTube with Docker
 run_with_docker() {
+    local port=$1
     echo -e "\n${BOLD}Setting up SubTube with Docker...${NC}"
     
     # Create a directory for SubTube
@@ -294,6 +407,9 @@ run_with_docker() {
         exit 1
     fi
     
+    # Create docker-compose.yml with the specified port
+    create_compose_file "$port" "$install_dir"
+    
     # Build and run with Docker Compose
     echo -e "\n${BOLD}Building and starting SubTube with Docker...${NC}"
     
@@ -307,7 +423,7 @@ run_with_docker() {
     # Check if container is running
     if [ $? -eq 0 ]; then
         echo -e "\n${GREEN}SubTube is now running!${NC}"
-        echo -e "You can access it at ${BOLD}http://localhost:5000${NC}"
+        echo -e "You can access it at ${BOLD}http://localhost:${port}${NC}"
         echo -e "\nTo stop SubTube, run: ${YELLOW}cd $install_dir && docker-compose down${NC}"
         echo -e "To start it again, run: ${YELLOW}cd $install_dir && docker-compose up -d${NC}"
     else
@@ -327,11 +443,14 @@ main() {
     # Check system requirements
     check_requirements
     
+    # Get port from user
+    PORT=$(get_valid_port)
+    
     # Show progress for downloading
     show_progress 3 "${BOLD}Preparing installation...${NC}"
     
     # Install and run with Docker
-    run_with_docker
+    run_with_docker "$PORT"
     
     echo -e "\n${GREEN}${BOLD}Installation completed successfully!${NC}"
     echo -e "Thank you for installing SubTube!"
