@@ -247,28 +247,124 @@ run_without_docker() {
     
     # Run the application in background if requested
     echo "Starting SubTube..."
-    echo -e "${GREEN}✓${NC} SubTube is now running!"
-    echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
+    
+    # Verify app.py exists
+    if [ ! -f "app.py" ]; then
+        echo -e "${RED}Error: app.py not found in the current directory!${NC}"
+        echo "Contents of the current directory:"
+        ls -la
+        echo -e "${YELLOW}Trying to find app.py in subdirectories...${NC}"
+        find . -name "app.py" -type f
+        
+        # Look for app.py in subdirectories and if found, change to that directory
+        APP_PATH=$(find . -name "app.py" -type f | head -1)
+        if [ -n "$APP_PATH" ]; then
+            APP_DIR=$(dirname "$APP_PATH")
+            echo -e "${GREEN}Found app.py in $APP_DIR, changing to that directory.${NC}"
+            cd "$APP_DIR" || { echo "Failed to change to directory with app.py"; exit 1; }
+        else
+            echo -e "${RED}Cannot find app.py in any subdirectory. Installation failed.${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Check requirements.txt exists
+    if [ ! -f "requirements.txt" ]; then
+        echo -e "${RED}Warning: requirements.txt not found!${NC}"
+        echo "Creating basic requirements.txt file..."
+        echo "flask==2.0.1
+requests==2.26.0
+youtube_transcript_api==0.4.4" > requirements.txt
+    fi
     
     # Create a script to run the app and handle stopping
     cat > run_subtube.sh << EOL
 #!/bin/bash
-cd "$INSTALL_DIR"
+cd "$(pwd)"
 source venv/bin/activate
+
+# Check if Flask is installed
+if ! python3 -c "import flask" 2>/dev/null; then
+    echo "Installing Flask..."
+    pip3 install flask requests youtube_transcript_api
+fi
+
+# Determine which port flag to use
 if grep -q -- "--port" app.py; then
     python3 app.py --port $PORT
-else
+elif grep -q -- "-p" app.py; then
     python3 app.py -p $PORT
+else
+    # If we can't determine which flag to use, try both
+    echo "Trying to run with --port flag..."
+    python3 app.py --port $PORT || python3 app.py -p $PORT
 fi
 EOL
     chmod +x run_subtube.sh
     
+    # Create a verification script to check if the app is running
+    cat > verify_subtube.sh << EOL
+#!/bin/bash
+PORT=$PORT
+MAX_ATTEMPTS=30
+ATTEMPT=0
+
+echo "Verifying SubTube is running on http://localhost:$PORT..."
+
+while [ \$ATTEMPT -lt \$MAX_ATTEMPTS ]; do
+    ATTEMPT=\$((ATTEMPT+1))
+    echo "Checking connection (attempt \$ATTEMPT of \$MAX_ATTEMPTS)..."
+    
+    if command -v curl >/dev/null 2>&1; then
+        RESPONSE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT)
+        if [ "\$RESPONSE" = "200" ] || [ "\$RESPONSE" = "302" ]; then
+            echo "✅ Connection successful! SubTube is running."
+            exit 0
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if wget -q --spider http://localhost:$PORT; then
+            echo "✅ Connection successful! SubTube is running."
+            exit 0
+        fi
+    elif command -v nc >/dev/null 2>&1; then
+        if nc -z localhost $PORT; then
+            echo "✅ Port $PORT is open. SubTube appears to be running."
+            exit 0
+        fi
+    else
+        echo "No tools available to check connection. Please verify manually."
+        exit 1
+    fi
+    
+    sleep 1
+done
+
+echo "❌ Failed to verify SubTube is running after \$MAX_ATTEMPTS attempts."
+echo "Please check logs at $(pwd)/subtube.log"
+exit 1
+EOL
+    chmod +x verify_subtube.sh
+    
     if [ "$BACKGROUND" = true ]; then
         echo -e "${YELLOW}Running in background. To stop SubTube, run: pkill -f 'python.*app.py'${NC}"
         nohup ./run_subtube.sh > subtube.log 2>&1 &
-        echo $! > subtube.pid
-        echo -e "${GREEN}SubTube is running in the background with PID $(cat subtube.pid)${NC}"
-        echo -e "${YELLOW}View logs at: $INSTALL_DIR/subtube.log${NC}"
+        APP_PID=$!
+        echo $APP_PID > subtube.pid
+        echo -e "${GREEN}SubTube is starting in the background with PID $APP_PID${NC}"
+        echo -e "${YELLOW}View logs at: $(pwd)/subtube.log${NC}"
+        
+        # Verify the app is running
+        ./verify_subtube.sh
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Warning: Could not verify SubTube is running properly.${NC}"
+            echo -e "Please check the logs at: ${YELLOW}$(pwd)/subtube.log${NC}"
+            echo -e "Try opening: ${GREEN}http://localhost:${PORT}${NC} in your browser"
+            echo -e "If the site doesn't load, try running the app manually:"
+            echo -e "${YELLOW}cd $(pwd) && source venv/bin/activate && python3 app.py -p ${PORT}${NC}"
+        else
+            echo -e "${GREEN}✓${NC} SubTube is now running!"
+            echo -e "Access SubTube at: ${GREEN}http://localhost:${PORT}${NC}"
+        fi
     else
         echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
         ./run_subtube.sh
