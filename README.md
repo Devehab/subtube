@@ -27,6 +27,7 @@ SubTube is a powerful web application that allows users to download, view, and c
 - [Contributing](#-contributing)
 - [License](#-license)
 - [Author](#-author)
+- [Support My Work](#-support-my-work)
 
 ## ✨ Features
 
@@ -169,6 +170,27 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ## 👨‍💻 Author
 
 - **Ehab Kahwati** - [GitHub](https://github.com/Devehab)
+
+## ☕ Support My Work
+
+If you find SubTube useful in your daily workflow, please consider supporting my work! I'm passionate about creating open-source tools that solve real problems.
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/ehabkahwati" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50px">
+  </a>
+</p>
+
+As an independent developer, I dedicate my time to building and maintaining various open-source web applications and Chrome extensions that are freely available to everyone. Your support helps me:
+
+- ✨ Continue developing new features for SubTube
+- 🐛 Fix bugs and maintain existing projects
+- 🚀 Create new open-source tools for the community
+- 💡 Explore innovative ideas and technologies
+
+Even a small contribution goes a long way in supporting the development of tools that make the internet more accessible and useful for everyone.
+
+**Thank you for your support!** ❤️
 
 ---
 
