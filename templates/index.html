@@ -57,11 +57,17 @@
                             </button>
                         </div>
                     </div>
-                    <div class="self-end">
-                        <button type="submit" id="fetchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition">
-                            <i class="fas fa-search mr-2"></i>Fetch Subtitles
-                        </button>
-                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    <button type="submit" id="fetchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition">
+                        <i class="fas fa-search mr-2"></i>Fetch Subtitles
+                    </button>
+                    <button type="button" id="quickEnglishBtn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition">
+                        <i class="fas fa-language mr-2"></i>Copy English Text
+                    </button>
+                    <button type="button" id="quickArabicBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition">
+                        <i class="fas fa-language mr-2"></i>Copy Arabic Text
+                    </button>
                 </div>
             </form>
 
@@ -428,6 +434,163 @@
             function isValidYouTubeUrl(url) {
                 const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/;
                 return youtubeRegex.test(url);
+            }
+            
+            // Quick English button click handler
+            const quickEnglishBtn = document.getElementById('quickEnglishBtn');
+            quickEnglishBtn.addEventListener('click', function() {
+                videoUrl = youtubeUrlInput.value.trim();
+                if (!isValidYouTubeUrl(videoUrl)) {
+                    showError('Please enter a valid YouTube URL');
+                    return;
+                }
+                
+                // Reset previous results
+                languageSection.classList.add('hidden');
+                formatSection.classList.add('hidden');
+                rawTextSection.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+                
+                // Show loading
+                loading.classList.remove('hidden');
+                
+                // First try to get English subtitles
+                tryGetEnglishSubtitles('en');
+            });
+            
+            function tryGetEnglishSubtitles(langCode) {
+                const formData = new FormData();
+                formData.append('url', videoUrl);
+                formData.append('language', langCode);
+                
+                fetch('/get_raw_text', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error && langCode === 'en') {
+                        // If English failed, try auto-generated English
+                        tryGetEnglishSubtitles('en-US');
+                        return;
+                    } else if (data.error && langCode === 'en-US') {
+                        // If auto-generated English also failed, try a.en
+                        tryGetEnglishSubtitles('a.en');
+                        return;
+                    } else if (data.error) {
+                        loading.classList.add('hidden');
+                        showError('No English subtitles available for this video');
+                        return;
+                    }
+                    
+                    loading.classList.add('hidden');
+                    
+                    // Copy raw text
+                    navigator.clipboard.writeText(data.text)
+                        .then(() => {
+                            // Show success message with subtitle type information
+                            let subtitleType = "original";
+                            if (langCode === 'en-US' || langCode === 'a.en') {
+                                subtitleType = "auto-generated";
+                            }
+                            showCustomCopySuccess(`English ${subtitleType} subtitles copied!`);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy text: ', err);
+                        });
+                })
+                .catch(error => {
+                    loading.classList.add('hidden');
+                    showError('Error: ' + error.message);
+                });
+            }
+            
+            // Custom copy success message function
+            function showCustomCopySuccess(message) {
+                // Create or update custom success message
+                let customSuccess = document.getElementById('customCopySuccess');
+                if (!customSuccess) {
+                    customSuccess = document.createElement('div');
+                    customSuccess.id = 'customCopySuccess';
+                    customSuccess.className = 'fixed top-4 right-4 bg-green-500 text-white py-2 px-4 rounded-md text-sm shadow-lg z-50';
+                    document.body.appendChild(customSuccess);
+                }
+                
+                customSuccess.textContent = message;
+                customSuccess.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    customSuccess.classList.add('hidden');
+                }, 3000);
+            }
+            
+            // Quick Arabic button click handler
+            const quickArabicBtn = document.getElementById('quickArabicBtn');
+            quickArabicBtn.addEventListener('click', function() {
+                videoUrl = youtubeUrlInput.value.trim();
+                if (!isValidYouTubeUrl(videoUrl)) {
+                    showError('Please enter a valid YouTube URL');
+                    return;
+                }
+                
+                // Reset previous results
+                languageSection.classList.add('hidden');
+                formatSection.classList.add('hidden');
+                rawTextSection.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+                
+                // Show loading
+                loading.classList.remove('hidden');
+                
+                // First try to get Arabic subtitles
+                tryGetArabicSubtitles('ar');
+            });
+            
+            function tryGetArabicSubtitles(langCode) {
+                const formData = new FormData();
+                formData.append('url', videoUrl);
+                formData.append('language', langCode);
+                
+                fetch('/get_raw_text', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error && langCode === 'ar') {
+                        // If Arabic failed, try auto-generated Arabic
+                        tryGetArabicSubtitles('ar-SA');
+                        return;
+                    } else if (data.error && langCode === 'ar-SA') {
+                        // If auto-generated Arabic also failed, try a.ar
+                        tryGetArabicSubtitles('a.ar');
+                        return;
+                    } else if (data.error) {
+                        loading.classList.add('hidden');
+                        showError('No Arabic subtitles available for this video');
+                        return;
+                    }
+                    
+                    loading.classList.add('hidden');
+                    
+                    // Copy raw text
+                    navigator.clipboard.writeText(data.text)
+                        .then(() => {
+                            // Show success message with subtitle type information
+                            let subtitleType = "original";
+                            if (langCode === 'ar-SA' || langCode === 'a.ar') {
+                                subtitleType = "auto-generated";
+                            }
+                            showCustomCopySuccess(`Arabic ${subtitleType} subtitles copied!`);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy text: ', err);
+                        });
+                })
+                .catch(error => {
+                    loading.classList.add('hidden');
+                    showError('Error: ' + error.message);
+                });
             }
         });
     </script>

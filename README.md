@@ -8,6 +8,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://github.com/Devehab/subtube)
 [![Platform](https://img.shields.io/badge/Platform-Web-brightgreen)](https://github.com/Devehab/subtube)
 [![Python](https://img.shields.io/badge/Python-3.6+-yellow)](https://github.com/Devehab/subtube)
+[![Version](https://img.shields.io/badge/Version-v1.1.0-orange)](https://github.com/Devehab/subtube)
 
 SubTube is a powerful web application that allows users to download, view, and copy subtitles from YouTube videos in various formats. Built with Flask and modern web technologies, it offers a seamless experience for accessing subtitle content without requiring advanced technical knowledge.
 
@@ -34,6 +35,8 @@ SubTube is a powerful web application that allows users to download, view, and c
 - 📝 **Multi-format Support**: Download subtitles in SRT, VTT, or TXT format
 - 🌐 **Language Selection**: Support for all subtitle languages available on YouTube videos
 - 📋 **RAW Text Display**: View and copy subtitle text directly in the browser without downloading
+- 🚀 **Quick Copy Buttons**: Copy English or Arabic subtitles directly with a single click (v1.1.0+)
+- 🔄 **Smart Subtitle Detection**: Automatically tries different subtitle variants if the primary one isn't available
 - 📱 **Responsive Design**: Works seamlessly on desktop and mobile devices
 - 🔄 **Easy URL Pasting**: Paste button for quick URL input from clipboard
 - 🎨 **Modern UI**: Clean and intuitive interface built with Tailwind CSS
@@ -100,6 +103,39 @@ SubTube is a powerful web application that allows users to download, view, and c
    ```bash
    docker-compose down
    ```
+
+### Docker Image Versions
+
+SubTube is available in multiple Docker image versions:
+
+- **v1.1.0** (Latest with Quick Copy Buttons): `devehab/subtube:v1.1.0`
+  - Includes the new "Copy English Text" and "Copy Arabic Text" buttons
+  - Provides instant subtitle copying with a single click
+  - Shows whether the copied subtitles are original or auto-generated
+
+- **v1.0.0** (Original Version): `devehab/subtube:latest`
+  - Original version without the quick copy buttons
+
+To use a specific version, update your docker-compose.yml file:
+
+```yaml
+services:
+  subtube:
+    image: devehab/subtube:v1.1.0  # or :latest for v1.0.0
+    # other configuration...
+```
+
+### Multi-Architecture Docker Build
+
+SubTube v1.1.0 supports both ARM (Apple Silicon) and AMD64 architectures. To use the multi-architecture build:
+
+```yaml
+services:
+  subtube:
+    image: devehab/subtube:v1.1.0
+    platform: linux/amd64,linux/arm64
+    # other configuration...
+```
 
 #### Multi-Architecture Docker Build:
 
