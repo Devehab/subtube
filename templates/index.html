@@ -337,36 +337,20 @@
             
             // Copy raw text button
             copyRawBtn.addEventListener('click', function() {
-                const textToCopy = rawTextContent.textContent;
+                const textToCopy = document.getElementById('rawTextContent').innerText;
                 
-                // Fallback for older browsers
-                if (!navigator.clipboard) {
-                    const textarea = document.createElement('textarea');
-                    textarea.value = textToCopy;
-                    textarea.style.position = 'fixed';
-                    document.body.appendChild(textarea);
-                    textarea.focus();
-                    textarea.select();
-                    
-                    try {
-                        document.execCommand('copy');
-                        showCopySuccess();
-                    } catch (err) {
-                        console.error('Failed to copy text: ', err);
+                // Use our cross-browser clipboard solution
+                copyTextToClipboard(textToCopy, function(success) {
+                    if (success) {
+                        // Show success message
+                        copySuccess.classList.remove('hidden');
+                        setTimeout(() => {
+                            copySuccess.classList.add('hidden');
+                        }, 2000);
+                    } else {
+                        showError('Failed to copy text. Your browser may not support clipboard operations.');
                     }
-                    
-                    document.body.removeChild(textarea);
-                    return;
-                }
-                
-                // Modern browsers
-                navigator.clipboard.writeText(textToCopy)
-                    .then(() => {
-                        showCopySuccess();
-                    })
-                    .catch(err => {
-                        console.error('Failed to copy text: ', err);
-                    });
+                });
             });
             
             function showCopySuccess() {
@@ -485,19 +469,19 @@
                     
                     loading.classList.add('hidden');
                     
-                    // Copy raw text
-                    navigator.clipboard.writeText(data.text)
-                        .then(() => {
+                    // Copy raw text with fallback for mobile
+                    copyTextToClipboard(data.text, function(success) {
+                        if (success) {
                             // Show success message with subtitle type information
                             let subtitleType = "original";
                             if (langCode === 'en-US' || langCode === 'a.en') {
                                 subtitleType = "auto-generated";
                             }
                             showCustomCopySuccess(`English ${subtitleType} subtitles copied!`);
-                        })
-                        .catch(err => {
-                            console.error('Failed to copy text: ', err);
-                        });
+                        } else {
+                            showError('Failed to copy text. Your browser may not support clipboard operations.');
+                        }
+                    });
                 })
                 .catch(error => {
                     loading.classList.add('hidden');
@@ -573,24 +557,240 @@
                     
                     loading.classList.add('hidden');
                     
-                    // Copy raw text
-                    navigator.clipboard.writeText(data.text)
-                        .then(() => {
+                    // Copy raw text with fallback for mobile
+                    copyTextToClipboard(data.text, function(success) {
+                        if (success) {
                             // Show success message with subtitle type information
                             let subtitleType = "original";
                             if (langCode === 'ar-SA' || langCode === 'a.ar') {
                                 subtitleType = "auto-generated";
                             }
                             showCustomCopySuccess(`Arabic ${subtitleType} subtitles copied!`);
-                        })
-                        .catch(err => {
-                            console.error('Failed to copy text: ', err);
-                        });
+                        } else {
+                            showError('Failed to copy text. Your browser may not support clipboard operations.');
+                        }
+                    });
                 })
                 .catch(error => {
                     loading.classList.add('hidden');
                     showError('Error: ' + error.message);
                 });
+            }
+            
+            // Cross-browser clipboard text copy function with fallback
+            function copyTextToClipboard(text, callback) {
+                // Try the modern Clipboard API first
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text)
+                        .then(() => {
+                            callback(true);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy with Clipboard API: ', err);
+                            // Fall back to the text area method for desktop
+                            if (!isMobileDevice()) {
+                                fallbackCopyTextToClipboard(text, callback);
+                            } else {
+                                // Mobile fallback - show text in modal for manual copy
+                                showTextInModal(text, callback);
+                            }
+                        });
+                } else {
+                    // Check if mobile or desktop
+                    if (!isMobileDevice()) {
+                        // Desktop fallback
+                        fallbackCopyTextToClipboard(text, callback);
+                    } else {
+                        // Mobile fallback - show text in modal for manual copy
+                        showTextInModal(text, callback);
+                    }
+                }
+            }
+            
+            // Check if device is mobile
+            function isMobileDevice() {
+                return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
+            }
+            
+            // Show text in modal for mobile users to manually copy
+            function showTextInModal(text, callback) {
+                // Create modal elements
+                const modalOverlay = document.createElement('div');
+                modalOverlay.style.position = 'fixed';
+                modalOverlay.style.top = '0';
+                modalOverlay.style.left = '0';
+                modalOverlay.style.width = '100%';
+                modalOverlay.style.height = '100%';
+                modalOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                modalOverlay.style.zIndex = '1000';
+                modalOverlay.style.display = 'flex';
+                modalOverlay.style.justifyContent = 'center';
+                modalOverlay.style.alignItems = 'center';
+                
+                const modalContent = document.createElement('div');
+                modalContent.style.backgroundColor = 'white';
+                modalContent.style.borderRadius = '8px';
+                modalContent.style.padding = '20px';
+                modalContent.style.width = '90%';
+                modalContent.style.maxWidth = '500px';
+                modalContent.style.maxHeight = '80%';
+                modalContent.style.overflow = 'auto';
+                modalContent.style.position = 'relative';
+                
+                const closeButton = document.createElement('button');
+                closeButton.textContent = 'Close';
+                closeButton.style.position = 'absolute';
+                closeButton.style.top = '10px';
+                closeButton.style.right = '10px';
+                closeButton.style.padding = '5px 10px';
+                closeButton.style.backgroundColor = '#f44336';
+                closeButton.style.color = 'white';
+                closeButton.style.border = 'none';
+                closeButton.style.borderRadius = '4px';
+                closeButton.style.cursor = 'pointer';
+                
+                const title = document.createElement('h3');
+                title.textContent = 'Copy Text';
+                title.style.marginBottom = '15px';
+                title.style.marginTop = '5px';
+                title.style.textAlign = 'center';
+                
+                const instructions = document.createElement('p');
+                instructions.innerHTML = 'Press the <strong>"Copy Text"</strong> button below';
+                instructions.style.marginBottom = '10px';
+                instructions.style.textAlign = 'center';
+                instructions.style.color = '#666';
+                instructions.style.fontSize = '14px';
+                
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.width = '100%';
+                textArea.style.height = '200px';
+                textArea.style.padding = '10px';
+                textArea.style.border = '1px solid #ddd';
+                textArea.style.borderRadius = '4px';
+                textArea.style.marginBottom = '15px';
+                textArea.style.direction = 'ltr'; 
+                textArea.style.backgroundColor = '#f9f9f9';
+                textArea.id = 'modalTextArea';
+                textArea.readOnly = true; // Make read-only to prevent keyboard from appearing on mobile
+                
+                // Create copy button (main action)
+                const copyButton = document.createElement('button');
+                copyButton.textContent = 'Copy Text';
+                copyButton.style.backgroundColor = '#4CAF50';
+                copyButton.style.color = 'white';
+                copyButton.style.border = 'none';
+                copyButton.style.padding = '12px 20px';
+                copyButton.style.textAlign = 'center';
+                copyButton.style.textDecoration = 'none';
+                copyButton.style.display = 'inline-block';
+                copyButton.style.fontSize = '16px';
+                copyButton.style.margin = '4px 2px';
+                copyButton.style.cursor = 'pointer';
+                copyButton.style.borderRadius = '4px';
+                copyButton.style.width = '100%';
+                
+                // Create success message
+                const successMessage = document.createElement('div');
+                successMessage.textContent = 'Text copied successfully!';
+                successMessage.style.color = '#4CAF50';
+                successMessage.style.textAlign = 'center';
+                successMessage.style.padding = '10px';
+                successMessage.style.display = 'none';
+                successMessage.style.fontWeight = 'bold';
+                
+                // Add copy functionality
+                copyButton.addEventListener('click', function() {
+                    textArea.select();
+                    textArea.setSelectionRange(0, 99999); // For mobile devices
+                    
+                    let success = false;
+                    try {
+                        success = document.execCommand('copy');
+                    } catch (err) {
+                        console.error('Fallback: Could not copy text: ', err);
+                    }
+                    
+                    if (success) {
+                        // Show success message
+                        successMessage.style.display = 'block';
+                        copyButton.style.backgroundColor = '#45a049';
+                        copyButton.textContent = 'Copied!';
+                        
+                        // Hide after 2 seconds
+                        setTimeout(function() {
+                            successMessage.style.display = 'none';
+                            copyButton.style.backgroundColor = '#4CAF50';
+                            copyButton.textContent = 'Copy Text';
+                        }, 2000);
+                    } else {
+                        // Fallback to manual selection instructions
+                        instructions.innerHTML = 'Automatic copy failed. <strong>Press and hold on the text</strong> then select Copy from the menu.';
+                        instructions.style.color = '#ff9800';
+                    }
+                });
+                
+                // Add manual fallback instructions
+                const manualInstructions = document.createElement('p');
+                manualInstructions.innerHTML = 'If the button doesn\'t work, you can <strong>press and hold on the text</strong> then select Copy.';
+                manualInstructions.style.marginTop = '10px';
+                manualInstructions.style.textAlign = 'center';
+                manualInstructions.style.color = '#999';
+                manualInstructions.style.fontSize = '12px';
+                
+                // Append elements
+                modalContent.appendChild(closeButton);
+                modalContent.appendChild(title);
+                modalContent.appendChild(instructions);
+                modalContent.appendChild(textArea);
+                modalContent.appendChild(copyButton);
+                modalContent.appendChild(successMessage);
+                modalContent.appendChild(manualInstructions);
+                modalOverlay.appendChild(modalContent);
+                document.body.appendChild(modalOverlay);
+                
+                // Focus and select text
+                setTimeout(function() {
+                    textArea.focus();
+                    textArea.select();
+                }, 100);
+                
+                // Close modal and callback
+                closeButton.onclick = function() {
+                    document.body.removeChild(modalOverlay);
+                    callback(true); // Consider it a success even if we don't know if they copied
+                };
+            }
+            
+            // Fallback method using textarea element (for desktop)
+            function fallbackCopyTextToClipboard(text, callback) {
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    
+                    // Make the textarea out of viewport
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    textArea.style.top = '-999999px';
+                    document.body.appendChild(textArea);
+                    
+                    // Ensure we can select it
+                    textArea.focus();
+                    textArea.select();
+                    
+                    // For iOS devices specifically
+                    textArea.setSelectionRange(0, 99999);
+                    
+                    // Execute the copy command
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    
+                    callback(successful);
+                } catch (err) {
+                    console.error('Fallback: Could not copy text: ', err);
+                    callback(false);
+                }
             }
         });
     </script>

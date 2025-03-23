@@ -8,11 +8,16 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://github.com/Devehab/subtube)
 [![Platform](https://img.shields.io/badge/Platform-Web-brightgreen)](https://github.com/Devehab/subtube)
 [![Python](https://img.shields.io/badge/Python-3.6+-yellow)](https://github.com/Devehab/subtube)
-[![Version](https://img.shields.io/badge/Version-v1.1.0-orange)](https://github.com/Devehab/subtube)
+[![Version](https://img.shields.io/badge/Version-v1.1.1-orange)](https://github.com/Devehab/subtube)
 
 SubTube is a powerful web application that allows users to download, view, and copy subtitles from YouTube videos in various formats. Built with Flask and modern web technologies, it offers a seamless experience for accessing subtitle content without requiring advanced technical knowledge.
 
 ![SubTube Screenshot](static/image/demo.gif)
+
+## 🆕 What's New in v1.1.1
+
+- **Fixed Mobile Copy Functionality**: Resolved an issue where the "Copy Arabic Text" and "Copy English Text" buttons weren't working properly on mobile browsers, particularly Google Chrome. The fix implements a special modal popup for mobile devices with a dedicated copy button that works across different mobile browsers and platforms.
+- **Improved Cross-Browser Compatibility**: Enhanced the clipboard functionality to work properly on both desktop and mobile browsers using a fallback mechanism when the standard Clipboard API isn't available.
 
 ## Table of Contents
 
@@ -108,8 +113,12 @@ SubTube is a powerful web application that allows users to download, view, and c
 
 SubTube is available in multiple Docker image versions:
 
-- **v1.1.0** (Latest with Quick Copy Buttons): `devehab/subtube:v1.1.0`
-  - Includes the new "Copy English Text" and "Copy Arabic Text" buttons
+- **v1.1.1** (Latest with Fixed Mobile Copy Functionality): `devehab/subtube:v1.1.1`
+  - Includes the fix for mobile copying functionality and improved cross-browser compatibility
+  - Provides a seamless experience for accessing subtitle content on both desktop and mobile devices
+
+- **v1.1.0** (Original Version with Quick Copy Buttons): `devehab/subtube:v1.1.0`
+  - Original version with the new "Copy English Text" and "Copy Arabic Text" buttons
   - Provides instant subtitle copying with a single click
   - Shows whether the copied subtitles are original or auto-generated
 
@@ -121,18 +130,18 @@ To use a specific version, update your docker-compose.yml file:
 ```yaml
 services:
   subtube:
-    image: devehab/subtube:v1.1.0  # or :latest for v1.0.0
+    image: devehab/subtube:v1.1.1  # or :latest for v1.0.0
     # other configuration...
 ```
 
 ### Multi-Architecture Docker Build
 
-SubTube v1.1.0 supports both ARM (Apple Silicon) and AMD64 architectures. To use the multi-architecture build:
+SubTube v1.1.1 supports both ARM (Apple Silicon) and AMD64 architectures. To use the multi-architecture build:
 
 ```yaml
 services:
   subtube:
-    image: devehab/subtube:v1.1.0
+    image: devehab/subtube:v1.1.1
     platform: linux/amd64,linux/arm64
     # other configuration...
 ```
